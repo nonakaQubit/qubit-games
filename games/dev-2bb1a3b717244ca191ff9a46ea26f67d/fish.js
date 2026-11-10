@@ -273,6 +273,27 @@ export class FishSchools {
   setScale(Z) { this.Z = Z; }
   _randDepth() { return this.layerY + (Math.random() - 0.5) * 0.4; }
 
+  // 生きている魚の実体座標の重心（見た目の中心）を計算
+  getVisualCenter(s, out = new THREE.Vector3()) {
+    const sc = this.schools[s];
+    if (!sc) return out.set(0, 0, 0);
+    const i0 = s * PER_SCHOOL, i1 = i0 + sc.size;
+    const pos = this.pos, alive = this.alive;
+    let sx = 0, sy = 0, sz = 0, count = 0;
+    for (let i = i0; i < i1; i++) {
+      if (alive[i]) {
+        sx += pos[i * 3];
+        sy += pos[i * 3 + 1];
+        sz += pos[i * 3 + 2];
+        count++;
+      }
+    }
+    if (count > 0) {
+      return out.set(sx / count, sy / count, sz / count);
+    }
+    return out.copy(sc.center);
+  }
+
   _newTarget(school) {
     const a = Math.random() * Math.PI * 2, d = (6 + Math.random() * 12) * this.Z.V;
     school.target.set(school.center.x + Math.sin(a) * d, this._randDepth(), school.center.z + Math.cos(a) * d);

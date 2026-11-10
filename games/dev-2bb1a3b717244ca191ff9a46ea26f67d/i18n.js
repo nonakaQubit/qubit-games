@@ -53,7 +53,7 @@ const S = {
     copiedMsg: 'クリップボードにコピーしました',
     spellSuccessMsg: '呪文が通じ、旅の記憶が蘇りました！',
     spellErrorMsg: 'その呪文は違っているようです…',
-    tweetTemplate: '{whale}で{area}を回遊中。\n旅の言葉：{words}\n\n#Rorqual #ヒゲクジラシミュレータ\n',
+    tweetTemplate: '{whale}で{area}を回遊中。\n旅の言葉：{words}\n\n#Rorqual #ヒゲクジラシミュレータ #AIゲーム #AIGameDev\n',
     endingLines: [
       'こうして、クジラたちはひと夏を食べて過ごした。',
       'ナガスクジラの仲間は、すらりと細長く、速い。',
@@ -146,7 +146,7 @@ const S = {
     copiedMsg: 'Copied to clipboard!',
     spellSuccessMsg: 'The spell resonates! Your voyage is restored.',
     spellErrorMsg: 'That spell does not seem to resonate...',
-    tweetTemplate: 'Cruising {area} as a {whale}.\nVoyage words: {words}\n\n#Rorqual #WhaleSimulator\n',
+    tweetTemplate: 'Cruising {area} as a {whale}.\nVoyage words: {words}\n\n#Rorqual #WhaleSimulator #AIgame #AIGameDev\n',
     endingLines: [
       'And so the whales spent the summer eating.',
       'Rorquals are long, slender and fast.',

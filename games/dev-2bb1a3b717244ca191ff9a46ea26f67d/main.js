@@ -334,16 +334,24 @@ function updateWhale(dt) {
     st.autoT = (st.autoT || 0) + dt;
     if (st.baseYaw === undefined) st.baseYaw = st.yaw;
 
-    // 索餌ターゲットの探索（前方120度、12〜45mにある生きた群れ）
+    // クジラの口先（頭部）座標
+    const headX = p.x + Math.sin(st.yaw) * 3.6 * Z.S;
+    const headZ = p.z + Math.cos(st.yaw) * 3.6 * Z.S;
+
+    // 索餌ターゲットの探索（前方120度、12〜50mにある生きた群れ）
     let bestSchool = null;
+    let bestIdx = -1;
     let bestDist = Infinity;
+    const schoolCenter = new THREE.Vector3();
     if (fish && fish.schools) {
-      for (const sc of fish.schools) {
+      for (let s = 0; s < fish.schools.length; s++) {
+        const sc = fish.schools[s];
         if (sc.alive <= sc.size * 0.25) continue;
-        const dx = sc.center.x - p.x;
-        const dz = sc.center.z - p.z;
+        const c = fish.getVisualCenter ? fish.getVisualCenter(s, schoolCenter) : sc.center;
+        const dx = c.x - headX;
+        const dz = c.z - headZ;
         const dist = Math.hypot(dx, dz);
-        if (dist > 45 * Z.V || dist < 2.0) continue;
+        if (dist > 50 * Z.V || dist < 1.0) continue;
 
         // クジラの進行方向との角度差
         const angleToSchool = Math.atan2(dx, dz);
@@ -355,25 +363,36 @@ function updateWhale(dt) {
         if (Math.abs(angleDiff) < 1.4 && dist < bestDist) {
           bestDist = dist;
           bestSchool = sc;
+          bestIdx = s;
         }
       }
     }
 
     if (bestSchool && (st.lungeT < 0 || (st.lungeT / Z.T) < (LUNGE_OPEN + 0.8))) {
-      // 索餌・突進行動：群れの中心へ向けてしっかり軸を向ける（突進中は群れを豪快に貫通）
-      const dx = bestSchool.center.x - p.x;
-      const dz = bestSchool.center.z - p.z;
-      const targetAngle = Math.atan2(dx, dz);
+      // 生きている魚の実体重心（見た目の中心）を取得
+      const c = fish.getVisualCenter ? fish.getVisualCenter(bestIdx, schoolCenter) : bestSchool.center;
+
+      // 見越し照準（リード・インターセプト）：
+      // 魚群の移動速度とクジラの接近速度から到達予測時間を計算し、未来の魚群中心を狙う！
+      const curSpeed = Math.max(2.2 * Z.P, st.speed || 2.2 * Z.P);
+      const tLead = Math.min(2.5, bestDist / curSpeed);
+      const leadX = c.x + (bestSchool.vel?.x || 0) * tLead;
+      const leadZ = c.z + (bestSchool.vel?.z || 0) * tLead;
+
+      // 口先から見越し位置への正確な射線角度
+      const targetAngle = Math.atan2(leadX - headX, leadZ - headZ);
+
       let diff = targetAngle - st.baseYaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      const turnK = st.lungeT >= 0 ? 2.8 : 0.85;
+      const turnK = st.lungeT >= 0 ? 3.5 : 1.6;
       st.baseYaw += diff * Math.min(1, dt * turnK);
       targetYaw = st.baseYaw;
-      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 2.4 * Z.P;
+      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 2.5 * Z.P;
 
-      // 群れに近づいたら（6〜9m）豪快に突進・捕食！
-      if (st.lungeT < 0 && bestDist < 8.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+      // 突進発動タイミングの適正化：
+      // 助走タメ（0.65秒で約5m前進）を経て、口が全開になる瞬間にちょうど群れの入り口へ到達する距離（頭から11〜14m）
+      if (st.lungeT < 0 && bestDist < 13.0 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
         lungeReq = true;
         st.autoLunge = st.autoT;
         st.lungeJustFinished = true;
