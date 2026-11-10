@@ -396,29 +396,31 @@ export class FishSchools {
       if (school.alive < school.size * LEFTOVER) {
         school.leftT += dt;
         const scatterWait = window.RORQUAL_TUNING ? window.RORQUAL_TUNING.scatterDelay : LEFTOVER_WAIT;
-        if (!school.broken) {
-          school.broken = true;
-          if (window.RORQUAL_TUNING?.scatterEffect) {
-            school.pingGlow = 0.8;
-            const i0 = s * PER_SCHOOL, i1 = i0 + school.size;
-            for (let i = i0; i < i1; i++) {
-              if (alive[i]) {
-                const dx = pos[i * 3] - school.center.x;
-                const dz = pos[i * 3 + 2] - school.center.z;
-                const len = Math.hypot(dx, dz) || 1;
-                vel[i * 3] += (dx / len) * (F.maxSpeed * 2.5);
-                vel[i * 3 + 2] += (dz / len) * (F.maxSpeed * 2.5);
+        if (school.leftT >= scatterWait) {
+          if (!school.broken) {
+            school.broken = true;
+            if (window.RORQUAL_TUNING?.scatterEffect) {
+              school.pingGlow = 0.8;
+              const i0 = s * PER_SCHOOL, i1 = i0 + school.size;
+              for (let i = i0; i < i1; i++) {
+                if (alive[i]) {
+                  const dx = pos[i * 3] - school.center.x;
+                  const dz = pos[i * 3 + 2] - school.center.z;
+                  const len = Math.hypot(dx, dz) || 1;
+                  vel[i * 3] += (dx / len) * (F.maxSpeed * 2.8);
+                  vel[i * 3 + 2] += (dz / len) * (F.maxSpeed * 2.8);
+                }
+              }
+              try {
+                window.onSchoolCleared?.(school.center, school.species);
+              } catch (err) {
+                console.warn('onSchoolCleared error:', err);
               }
             }
-            try {
-              window.onSchoolCleared?.(school.center, school.species);
-            } catch (err) {
-              console.warn('onSchoolCleared error:', err);
-            }
           }
+          school.fade = Math.max(0, school.fade - dt / FADE_TIME);
+          if (school.fade <= 0 || school.alive === 0) { this._respawnFar(s, whalePos); continue; }
         }
-        if (school.leftT > scatterWait) school.fade = Math.max(0, school.fade - dt / FADE_TIME);
-        if (school.fade <= 0 || school.alive === 0) { this._respawnFar(s, whalePos); continue; }
       }
 
       _v.subVectors(school.target, school.center);

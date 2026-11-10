@@ -728,11 +728,8 @@ window.onSchoolCleared = (schoolPos, species) => {
     if (spout?.emitWhaleJoy && whale?.group) {
       spout.emitWhaleJoy(whale.group, Z.S, 18);
     }
-    // 2. 控えめな泡のさざ波
-    if (spout?.emitSplash && schoolPos) {
-      spout.emitSplash(schoolPos, Z.S * 0.4, 15);
-    }
-    // 3. 画面中央上部の控えめなトースト表示
+    // (水面の白波・水煙 emitSplash は海中捕食に不自然なため削除)
+    // 2. 画面中央上部の控えめなトースト表示
     const toast = document.getElementById('clearToast');
     if (toast) {
       toast.textContent = '群れを捕食完了';

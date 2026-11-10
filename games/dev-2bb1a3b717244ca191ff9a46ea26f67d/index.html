@@ -55,7 +55,9 @@
 </div>
 <div id="msg"></div>
 <div id="fps"></div>
-<script type="module" src="main.js?v=20261110_fix1"></script>
+<script type="module">
+  import("./main.js?v=" + Date.now());
+</script>
 
 <style>
 #tunePanel {
@@ -109,9 +111,9 @@
   
   <div style="font-size: 10.5px; opacity: 0.8; margin-bottom: 6px;">ワンタッチ・プリセット比較:</div>
   <div class="tune-presets">
-    <button class="tune-btn active" id="presetOrig" onclick="applyPreset('orig')">① 現行<br><span style="font-size:9px;opacity:0.7;">重厚・高慣性</span></button>
-    <button class="tune-btn" id="presetMild" onclick="applyPreset('mild')">② マイルド<br><span style="font-size:9px;opacity:0.7;">旋回性2倍</span></button>
-    <button class="tune-btn" id="presetDirect" onclick="applyPreset('direct')">③ パワーW<br><span style="font-size:9px;opacity:0.7;">素直・チル</span></button>
+    <button class="tune-btn active" id="presetCustom" onclick="applyPreset('custom')">★ 推薦設定<br><span style="font-size:9px;opacity:0.7;">1.5 / 0.5 / 1.0</span></button>
+    <button class="tune-btn" id="presetOrig" onclick="applyPreset('orig')">旧現行<br><span style="font-size:9px;opacity:0.7;">重厚・高慣性</span></button>
+    <button class="tune-btn" id="presetDirect" onclick="applyPreset('direct')">パワーW<br><span style="font-size:9px;opacity:0.7;">最軽快・即散開</span></button>
   </div>
 
   <div class="tune-row">
@@ -146,12 +148,12 @@
 
 <script>
 window.RORQUAL_TUNING = {
-  turnRadiusMult: 1.0,
-  turnRateMult: 1.0,
-  deadzoneMult: 1.0,
-  lungeSteer: 0.0,
-  scatterDelay: 6.0,
-  scatterEffect: false,
+  turnRadiusMult: 0.5,
+  turnRateMult: 1.5,
+  deadzoneMult: 0.5,
+  lungeSteer: 1.0,
+  scatterDelay: 1.5,
+  scatterEffect: true,
 };
 
 function updateParam(k, val, labelId, unit) {
@@ -171,17 +173,23 @@ function updateEffect(val) {
 
 function applyPreset(type) {
   document.querySelectorAll('.tune-btn').forEach(b => b.classList.remove('active'));
-  if (type === 'orig') {
+  if (type === 'custom') {
+    document.getElementById('presetCustom').classList.add('active');
+    setValues(1.5, 0.5, 0.5, 1.0, 1.5, true);
+  } else if (type === 'orig') {
     document.getElementById('presetOrig').classList.add('active');
     setValues(1.0, 1.0, 1.0, 0.0, 6.0, false);
-  } else if (type === 'mild') {
-    document.getElementById('presetMild').classList.add('active');
-    setValues(1.8, 0.5, 0.5, 0.4, 1.5, true);
   } else if (type === 'direct') {
     document.getElementById('presetDirect').classList.add('active');
-    setValues(2.8, 0.25, 0.2, 0.8, 0.2, true);
+    setValues(2.5, 0.25, 0.2, 1.0, 0.2, true);
   }
 }
+
+// 初期値を入力スライダーに同期
+window.addEventListener('DOMContentLoaded', () => {
+  setValues(1.5, 0.5, 0.5, 1.0, 1.5, true);
+  document.getElementById('presetCustom').classList.add('active');
+});
 
 function setValues(rate, radius, dead, lunge, delay, effect) {
   document.getElementById('slRate').value = rate;
