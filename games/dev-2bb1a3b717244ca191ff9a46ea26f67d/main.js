@@ -1,16 +1,16 @@
 import * as THREE from 'three';
-import { Whale } from './whale.js?v=20261109_v44';
-import { FishSchools } from './fish.js?v=20261110_fix1';
-import { Sea } from './sea.js?v=20261109_v41';
-import { Spout } from './spout.js?v=20261107_v36';
-import { WhaleVoice, SoundRings, SoundIndicator, SoundEffects } from './voice.js?v=20261107_v36';
-import { WhalePod } from './pod.js?v=20261107_v33';
-import { Seabirds } from './birds.js';
-import { Dolphins } from './dolphins.js?v=20261107_v39';
-import { OceanCreatures } from './creatures.js?v=20261109_v44';
-import { setupFlow } from './flow.js?v=20261109_v44';
-import { t } from './i18n.js?v=20261109_v41';
-import { SPECIES, scalesOf } from './species.js?v=20261107_v21';
+import { Whale } from './whale.js?v=20261110_v53';
+import { FishSchools } from './fish.js?v=20261110_v53';
+import { Sea } from './sea.js?v=20261110_v53';
+import { Spout } from './spout.js?v=20261110_v53';
+import { WhaleVoice, SoundRings, SoundIndicator, SoundEffects } from './voice.js?v=20261110_v53';
+import { WhalePod } from './pod.js?v=20261110_v53';
+import { Seabirds } from './birds.js?v=20261110_v53';
+import { Dolphins } from './dolphins.js?v=20261110_v53';
+import { OceanCreatures } from './creatures.js?v=20261110_v53';
+import { setupFlow } from './flow.js?v=20261110_v53';
+import { t } from './i18n.js?v=20261110_v53';
+import { SPECIES, scalesOf } from './species.js?v=20261110_v53';
 
 // オホーツク海：灰緑の濁った冷たい海
 // 深さの操作はなし。クジラも魚の群れも同じくらいの深さを泳ぐ
@@ -351,7 +351,7 @@ function updateWhale(dt) {
         const dx = c.x - headX;
         const dz = c.z - headZ;
         const dist = Math.hypot(dx, dz);
-        if (dist > 50 * Z.V || dist < 1.0) continue;
+        if (dist > 50 * Z.V || dist < 0.2) continue;
 
         // クジラの進行方向との角度差
         const angleToSchool = Math.atan2(dx, dz);
@@ -388,11 +388,11 @@ function updateWhale(dt) {
       const turnK = st.lungeT >= 0 ? 3.5 : 1.6;
       st.baseYaw += diff * Math.min(1, dt * turnK);
       targetYaw = st.baseYaw;
-      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 2.5 * Z.P;
+      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 3.5 * Z.P;
 
-      // 突進発動タイミングの適正化：
-      // 助走タメ（0.65秒で約5m前進）を経て、口が全開になる瞬間にちょうど群れの入り口へ到達する距離（頭から11〜14m）
-      if (st.lungeT < 0 && bestDist < 13.0 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+      // 突進発動タイミング：
+      // 助走タメ（0.65秒で約4〜5m前進）を経て、口が全開になる瞬間にちょうど群れの入り口へ到達する距離（頭から9〜12m）
+      if (st.lungeT < 0 && bestDist < 11.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
         lungeReq = true;
         st.autoLunge = st.autoT;
         st.lungeJustFinished = true;
