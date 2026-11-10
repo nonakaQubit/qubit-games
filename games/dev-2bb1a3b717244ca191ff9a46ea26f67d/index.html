@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rorqual — ヒゲクジラシミュレータ</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d2a2c;
+    font-family: "Yu Gothic UI", "Meiryo", sans-serif; color: #e8f0ee;
+    touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; left: 18px; top: 14px; pointer-events: none; text-shadow: 0 1px 3px #0008; }
+  #area { font-size: 20px; letter-spacing: .12em; }
+  #species { font-size: 13px; opacity: .8; margin-top: 2px; }
+  #bellyWrap { margin-top: 10px; width: 220px; height: 8px; border-radius: 4px; background: #ffffff22; overflow: hidden; }
+  #belly { height: 100%; width: 0; background: linear-gradient(90deg, #8fcfc0, #f3efcf); transition: width .4s; }
+  #fps { position: fixed; right: 14px; bottom: 12px; font-size: 12px; opacity: .5; pointer-events: none; }
+  #help { position: fixed; left: 18px; bottom: 12px; font-size: 12px; opacity: .6; pointer-events: none; max-width: 62vw; }
+  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 28px; letter-spacing: .16em; opacity: 0; transition: opacity 2s; pointer-events: none;
+    text-shadow: 0 2px 10px #000a; padding: 0 20px; text-align: center; }
+  #touchControls { position: fixed; right: 14px; bottom: 34px; display: none; gap: 8px; align-items: center; z-index: 20; }
+  #touchControls.show { display: flex; }
+  .touch-btn { background: rgba(12, 38, 44, 0.36); color: rgba(232, 240, 238, 0.78);
+    border: 1px solid rgba(168, 224, 208, 0.28); border-radius: 22px; padding: 9px 14px;
+    font: inherit; font-size: 13px; letter-spacing: .06em; backdrop-filter: blur(3px);
+    cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .touch-btn:active { background: rgba(168, 224, 208, 0.32); color: #fff; border-color: rgba(168, 224, 208, 0.65); }
+  #touchMenuBtn { position: fixed; right: 14px; top: 14px; display: none; z-index: 20;
+    padding: 6px 12px; font-size: 12px; }
+  #touchMenuBtn.show { display: block; }
+  @media (max-width: 680px) {
+    #msg { font-size: 20px; letter-spacing: .1em; }
+    #help { font-size: 11px; bottom: 8px; max-width: 90vw; }
+    #bellyWrap { width: 170px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud">
+  <div id="area">オホーツク海</div>
+  <div id="species">ミンククジラ</div>
+  <div id="bellyWrap"><div id="belly"></div></div>
+</div>
+<div id="help">マウス：泳ぐ　左クリック：食べる（突進）　左ダブルクリック：潮吹き　右クリック：鳴く　右ダブルクリック：大ジャンプ　Esc：メニュー</div>
+<button id="touchMenuBtn" class="touch-btn">メニュー</button>
+<div id="touchControls">
+  <button id="btnCall" class="touch-btn">鳴く</button>
+  <button id="btnSpout" class="touch-btn">潮吹き</button>
+  <button id="btnBreach" class="touch-btn">ジャンプ</button>
+</div>
+<div id="msg"></div>
+<div id="fps"></div>
+<script type="module" src="main.js?v=20261109_v48"></script>
+
+<style>
+#tunePanel {
+  position: fixed; right: 14px; top: 50px; z-index: 100;
+  background: rgba(10, 28, 32, 0.88); border: 1px solid rgba(143, 207, 192, 0.4);
+  border-radius: 12px; padding: 14px 16px; width: 280px;
+  font-size: 12px; color: #e8f0ee; backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: sans-serif;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+#tunePanel.minimized {
+  transform: translateX(calc(100% + 20px));
+  opacity: 0;
+  pointer-events: none;
+}
+#tuneToggleBtn {
+  position: fixed; right: 14px; top: 14px; z-index: 101;
+  background: rgba(16, 45, 50, 0.85); border: 1px solid #8fcfc0;
+  color: #8fcfc0; border-radius: 18px; padding: 6px 14px;
+  font-size: 12px; font-weight: bold; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+}
+#tuneToggleBtn:hover { background: #8fcfc0; color: #0a1c20; }
+.tune-row { margin-bottom: 9px; display: flex; flex-direction: column; gap: 3px; }
+.tune-row label { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.9; }
+.tune-row input[type=range] { width: 100%; accent-color: #8fcfc0; cursor: pointer; }
+.tune-presets { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 12px; }
+.tune-btn {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(143,207,192,0.3);
+  color: #e8f0ee; border-radius: 6px; padding: 6px 4px; font-size: 10.5px;
+  cursor: pointer; text-align: center; line-height: 1.2;
+}
+.tune-btn.active {
+  background: rgba(143, 207, 192, 0.35); border-color: #8fcfc0; color: #fff; font-weight: bold;
+}
+#clearToast {
+  position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+  background: rgba(16, 45, 50, 0.75); border: 1px solid rgba(143, 207, 192, 0.6);
+  border-radius: 20px; padding: 7px 18px; font-size: 14px; letter-spacing: 0.08em;
+  color: #d8f5ea; pointer-events: none; opacity: 0; transition: opacity 0.4s ease;
+  z-index: 50; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+}
+</style>
+
+<button id="tuneToggleBtn">⚙ 操作テスト設定</button>
+<div id="tunePanel">
+  <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: #8fcfc0; display: flex; justify-content: space-between;">
+    <span>操作感・旋回チューニング</span>
+    <span style="font-size: 10px; opacity: 0.6; cursor: pointer;" onclick="document.getElementById('tuneToggleBtn').click()">閉じる ✕</span>
+  </div>
+  
+  <div style="font-size: 10.5px; opacity: 0.8; margin-bottom: 6px;">ワンタッチ・プリセット比較:</div>
+  <div class="tune-presets">
+    <button class="tune-btn active" id="presetOrig" onclick="applyPreset('orig')">① 現行<br><span style="font-size:9px;opacity:0.7;">重厚・高慣性</span></button>
+    <button class="tune-btn" id="presetMild" onclick="applyPreset('mild')">② マイルド<br><span style="font-size:9px;opacity:0.7;">旋回性2倍</span></button>
+    <button class="tune-btn" id="presetDirect" onclick="applyPreset('direct')">③ パワーW<br><span style="font-size:9px;opacity:0.7;">素直・チル</span></button>
+  </div>
+
+  <div class="tune-row">
+    <label><span>旋回追従レスポンス</span><span id="valRate">1.0x</span></label>
+    <input type="range" id="slRate" min="0.5" max="3.5" step="0.1" value="1.0" oninput="updateParam('turnRateMult', this.value, 'valRate', 'x')">
+  </div>
+  <div class="tune-row">
+    <label><span>最小旋回半径 (小さいほど小回り)</span><span id="valRadius">1.0x</span></label>
+    <input type="range" id="slRadius" min="0.15" max="1.5" step="0.05" value="1.0" oninput="updateParam('turnRadiusMult', this.value, 'valRadius', 'x')">
+  </div>
+  <div class="tune-row">
+    <label><span>近距離不感帯 (小さいほど近くの魚を狙える)</span><span id="valDead">1.0x</span></label>
+    <input type="range" id="slDead" min="0.15" max="1.2" step="0.05" value="1.0" oninput="updateParam('deadzoneMult', this.value, 'valDead', 'x')">
+  </div>
+  <div class="tune-row">
+    <label><span>突進中の舵取り受付</span><span id="valLunge">0.0 (不可)</span></label>
+    <input type="range" id="slLunge" min="0" max="1.0" step="0.1" value="0.0" oninput="updateParam('lungeSteer', this.value, 'valLunge', '')">
+  </div>
+  <div class="tune-row">
+    <label><span>群れ崩壊後の散開遅延</span><span id="valDelay">6.0 秒</span></label>
+    <input type="range" id="slDelay" min="0.1" max="6.0" step="0.2" value="6.0" oninput="updateParam('scatterDelay', this.value, 'valDelay', ' 秒')">
+  </div>
+  <div class="tune-row" style="margin-top: 4px;">
+    <label style="cursor:pointer;">
+      <input type="checkbox" id="cbEffect" onchange="updateEffect(this.checked)" style="accent-color: #8fcfc0;" />
+      <span>群れ完食の光波紋・散開エフェクト</span>
+    </label>
+  </div>
+</div>
+
+<div id="clearToast"></div>
+
+<script>
+window.RORQUAL_TUNING = {
+  turnRadiusMult: 1.0,
+  turnRateMult: 1.0,
+  deadzoneMult: 1.0,
+  lungeSteer: 0.0,
+  scatterDelay: 6.0,
+  scatterEffect: false,
+};
+
+function updateParam(k, val, labelId, unit) {
+  const num = parseFloat(val);
+  window.RORQUAL_TUNING[k] = num;
+  const lbl = document.getElementById(labelId);
+  if (lbl) {
+    lbl.textContent = (k === 'lungeSteer' && num === 0) ? '0.0 (不可)' : num.toFixed(k==='scatterDelay'?1:2) + unit;
+  }
+  document.querySelectorAll('.tune-btn').forEach(b => b.classList.remove('active'));
+}
+
+function updateEffect(val) {
+  window.RORQUAL_TUNING.scatterEffect = val;
+  document.querySelectorAll('.tune-btn').forEach(b => b.classList.remove('active'));
+}
+
+function applyPreset(type) {
+  document.querySelectorAll('.tune-btn').forEach(b => b.classList.remove('active'));
+  if (type === 'orig') {
+    document.getElementById('presetOrig').classList.add('active');
+    setValues(1.0, 1.0, 1.0, 0.0, 6.0, false);
+  } else if (type === 'mild') {
+    document.getElementById('presetMild').classList.add('active');
+    setValues(1.8, 0.5, 0.5, 0.4, 1.5, true);
+  } else if (type === 'direct') {
+    document.getElementById('presetDirect').classList.add('active');
+    setValues(2.8, 0.25, 0.2, 0.8, 0.2, true);
+  }
+}
+
+function setValues(rate, radius, dead, lunge, delay, effect) {
+  document.getElementById('slRate').value = rate;
+  document.getElementById('slRadius').value = radius;
+  document.getElementById('slDead').value = dead;
+  document.getElementById('slLunge').value = lunge;
+  document.getElementById('slDelay').value = delay;
+  document.getElementById('cbEffect').checked = effect;
+
+  window.RORQUAL_TUNING.turnRateMult = rate;
+  window.RORQUAL_TUNING.turnRadiusMult = radius;
+  window.RORQUAL_TUNING.deadzoneMult = dead;
+  window.RORQUAL_TUNING.lungeSteer = lunge;
+  window.RORQUAL_TUNING.scatterDelay = delay;
+  window.RORQUAL_TUNING.scatterEffect = effect;
+
+  document.getElementById('valRate').textContent = rate.toFixed(1) + 'x';
+  document.getElementById('valRadius').textContent = radius.toFixed(2) + 'x';
+  document.getElementById('valDead').textContent = dead.toFixed(2) + 'x';
+  document.getElementById('valLunge').textContent = lunge === 0 ? '0.0 (不可)' : lunge.toFixed(1);
+  document.getElementById('valDelay').textContent = delay.toFixed(1) + ' 秒';
+}
+
+const toggleBtn = document.getElementById('tuneToggleBtn');
+const panel = document.getElementById('tunePanel');
+toggleBtn.onclick = () => {
+  panel.classList.toggle('minimized');
+};
+</script>
+
+</body>
+</html>
