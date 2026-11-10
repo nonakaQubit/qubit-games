@@ -391,8 +391,9 @@ function updateWhale(dt) {
       targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 3.5 * Z.P;
 
       // 突進発動タイミング：
-      // 助走タメ（0.65秒で約4〜5m前進）を経て、口が全開になる瞬間にちょうど群れの入り口へ到達する距離（頭から9〜12m）
-      if (st.lungeT < 0 && bestDist < 11.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+      // 体長（Z.S）と群れスケール（Z.V）に連動させ、どのクジラ種でも群れの直前でガバッと口を開く間合い（ミンクで約6m）
+      const triggerDist = 2.2 * Z.S + 3.8 * Z.V;
+      if (st.lungeT < 0 && bestDist < triggerDist && st.autoT - (st.autoLunge || 0) > 8) {
         lungeReq = true;
         st.autoLunge = st.autoT;
         st.lungeJustFinished = true;
