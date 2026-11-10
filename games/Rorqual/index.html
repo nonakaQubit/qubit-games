@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rorqual — ヒゲクジラシミュレータ</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d2a2c;
+    font-family: "Yu Gothic UI", "Meiryo", sans-serif; color: #e8f0ee;
+    touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; left: 18px; top: 14px; pointer-events: none; text-shadow: 0 1px 3px #0008; }
+  #area { font-size: 20px; letter-spacing: .12em; }
+  #species { font-size: 13px; opacity: .8; margin-top: 2px; }
+  #bellyWrap { margin-top: 10px; width: 220px; height: 8px; border-radius: 4px; background: #ffffff22; overflow: hidden; }
+  #belly { height: 100%; width: 0; background: linear-gradient(90deg, #8fcfc0, #f3efcf); transition: width .4s; }
+  #fps { position: fixed; right: 14px; bottom: 12px; font-size: 12px; opacity: .5; pointer-events: none; }
+  #help { position: fixed; left: 18px; bottom: 12px; font-size: 12px; opacity: .6; pointer-events: none; max-width: 62vw; }
+  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 28px; letter-spacing: .16em; opacity: 0; transition: opacity 2s; pointer-events: none;
+    text-shadow: 0 2px 10px #000a; padding: 0 20px; text-align: center; }
+  #touchControls { position: fixed; right: 14px; bottom: 34px; display: none; gap: 8px; align-items: center; z-index: 20; }
+  #touchControls.show { display: flex; }
+  .touch-btn { background: rgba(12, 38, 44, 0.36); color: rgba(232, 240, 238, 0.78);
+    border: 1px solid rgba(168, 224, 208, 0.28); border-radius: 22px; padding: 9px 14px;
+    font: inherit; font-size: 13px; letter-spacing: .06em; backdrop-filter: blur(3px);
+    cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .touch-btn:active { background: rgba(168, 224, 208, 0.32); color: #fff; border-color: rgba(168, 224, 208, 0.65); }
+  #touchMenuBtn { position: fixed; right: 14px; top: 14px; display: none; z-index: 20;
+    padding: 6px 12px; font-size: 12px; }
+  #touchMenuBtn.show { display: block; }
+  @media (max-width: 680px) {
+    #msg { font-size: 20px; letter-spacing: .1em; }
+    #help { font-size: 11px; bottom: 8px; max-width: 90vw; }
+    #bellyWrap { width: 170px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud">
+  <div id="area">オホーツク海</div>
+  <div id="species">ミンククジラ</div>
+  <div id="bellyWrap"><div id="belly"></div></div>
+</div>
+<div id="help">マウス：泳ぐ　左クリック：食べる（突進）　左ダブルクリック：潮吹き　右クリック：鳴く　右ダブルクリック：大ジャンプ　Esc：メニュー</div>
+<button id="touchMenuBtn" class="touch-btn">メニュー</button>
+<div id="touchControls">
+  <button id="btnCall" class="touch-btn">鳴く</button>
+  <button id="btnSpout" class="touch-btn">潮吹き</button>
+  <button id="btnBreach" class="touch-btn">ジャンプ</button>
+</div>
+<div id="msg"></div>
+<div id="fps"></div>
+<script type="module" src="main.js?v=20261109_v48"></script>
+</body>
+</html>
