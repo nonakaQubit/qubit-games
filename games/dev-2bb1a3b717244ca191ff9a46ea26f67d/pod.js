@@ -55,19 +55,17 @@ export class WhalePod {
 
   // 個体ごとのランダムな体格・プロポーション・体色バリエーションを生成
   _createRandomVariation(baseSpecies, index, totalCount) {
-    // 群れの中でサイズ感にメリハリが出るよう、体長倍率の帯域をシャッフルしつつランダム決定
-    // （例：0.76〜0.88の小柄な若鯨、0.92〜1.04の標準個体、1.06〜1.18の堂々たる大型個体）
+    // プレイヤー（1.0）より大きい個体は出さず、自分を基準に小柄〜やや小柄な仲間だけにする（0.70〜0.94倍）
     const sizeBands = [
-      randRange(0.76, 0.89),
-      randRange(0.92, 1.05),
-      randRange(1.06, 1.18),
+      randRange(0.72, 0.83), // 小柄な若鯨
+      randRange(0.84, 0.93), // 標準より控えめなサイズ
     ];
-    const sizeScale = sizeBands[(index + Math.floor(Math.random() * totalCount)) % sizeBands.length] * randRange(0.96, 1.04);
+    const sizeScale = Math.min(0.94, sizeBands[index % sizeBands.length] * randRange(0.97, 1.01));
 
-    // 若く小柄な個体はややスマートで背びれが高め、大柄な個体は貫禄ある太めの体型になりやすい傾向＋ランダム個性
-    const isYoung = sizeScale < 0.90;
-    const slim = (isYoung ? randRange(0.90, 0.98) : randRange(0.97, 1.08));
-    const deep = (isYoung ? randRange(0.95, 1.01) : randRange(1.00, 1.07));
+    // 若く小柄な個体はややスマートで背びれが高め
+    const isYoung = sizeScale < 0.88;
+    const slim = (isYoung ? randRange(0.90, 0.98) : randRange(0.95, 1.02));
+    const deep = (isYoung ? randRange(0.95, 1.01) : randRange(0.98, 1.03));
     const dorsalSize = randRange(0.84, 1.22);
     const dorsalU = (baseSpecies.dorsalU ?? 0.69) + randRange(-0.02, 0.02);
 
@@ -118,8 +116,8 @@ export class WhalePod {
 
     // 海域ごとの仲間クジラ（南極海はクロミンク、他海域は同種）
     const companionSpeciesKey = area.id === 'antarctic' ? 'antarctic_minke' : (area.whale ?? 'minke');
-    // 仲間の頭数も 2〜3 頭でランダムに変化
-    const count = 2 + (Math.random() < 0.45 ? 1 : 0);
+    // 仲間の頭数は 1〜2 頭（多すぎて画面が騒がしくならない規模）
+    const count = 1 + (Math.random() < 0.5 ? 1 : 0);
 
     const baseSpecies = SPECIES[companionSpeciesKey];
 
