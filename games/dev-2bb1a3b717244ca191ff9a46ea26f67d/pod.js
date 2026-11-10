@@ -394,14 +394,10 @@ export class WhalePod {
           }
 
           // 近く（15m 以内）に魚の群れがあれば、たまに食事モードへ
-          // ※プレイヤーが狙っている獲物を横取りしないよう、プレイヤーから十分離れた（24m 以上）群れのみ対象
-          // ※子クジラはまだ授乳・真似事のため群れを襲わない
-          if (!st.isCalf && st.lungeT < 0 && st.breathT < 0 && Math.random() < 0.02) {
+          if (st.lungeT < 0 && st.breathT < 0 && Math.random() < 0.022) {
             if (this.fish && this.fish.schools) {
               for (const sc of this.fish.schools) {
-                const distToWhale = p.distanceTo(sc.center);
-                const distToPlayerSchool = playerPos.distanceTo(sc.center);
-                if (sc.alive > sc.size * 0.25 && distToWhale < 15 * this.Z.V && distToPlayerSchool > 24 * this.Z.V) {
+                if (sc.alive > sc.size * 0.25 && p.distanceTo(sc.center) < 15 * this.Z.V) {
                   st.mode = 'feed';
                   st.feedTarget = sc.center;
                   st.modeTimer = 5.0;
@@ -518,8 +514,10 @@ export class WhalePod {
       whale.group.updateMatrixWorld();
       whale.animate(dt, st.speed, st.gulp, st.open);
 
-      // 仲間クジラは豪快な突進・捕食アクション（開口・喉袋の膨らみ・急加速）の演出を行うが、
-      // プレイヤーの餌（完食ボーナスやスコア）を横取りして減らさないよう、魚のalive減少判定（eatGape）は行わない
+      if (st.open > 0.1 && this.fish) {
+        const inv = new THREE.Matrix4().copy(whale.group.matrixWorld).invert();
+        this.fish.eatGape(inv, whale.mouthGape(st.open));
+      }
     }
   }
 }
