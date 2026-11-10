@@ -81,7 +81,7 @@ const creatures = new OceanCreatures(scene, sea);
 creatures.setCamera(camera);
 
 // ---- お腹 ----
-const belly = { value: 15, full: false };
+const belly = { value: 30, full: false };
 const bellyWrapEl = document.getElementById('bellyWrap');
 const bellyEl = document.getElementById('belly');
 const msgEl = document.getElementById('msg');
@@ -615,13 +615,13 @@ function updateWhale(dt) {
     const drainRate = ((0.18 + (st.speed / Z.P) * 0.035 + (st.speed > 6 * Z.P ? 0.22 : 0)) / Z.T) * touchFactor;
     belly.value = Math.max(0, belly.value - dt * drainRate);
 
-    // 目的ガイド：ある程度おなかがすいてきて（belly <= 12）、しばらく食べていないときに案内を出す
+    // 目的ガイド：ある程度おなかがすいてきて（belly <= 10）、しばらく食べていないときに案内を出す
     st.sinceEat = (st.sinceEat || 0) + dt;
     st.guideCooldown = Math.max(0, (st.guideCooldown || 0) - dt);
-    if (!belly.full && belly.value <= 12.5 && st.sinceEat > 9 && st.guideCooldown <= 0) {
+    if (!belly.full && belly.value <= 10 && st.sinceEat > 9 && st.guideCooldown <= 0) {
       st.guideCooldown = 28;
       st.guideShowing = true;
-      showMsg(t('hungryGuide'), 5.5);
+      showMsg(isTouchMode ? t('hungryGuideTouch') : t('hungryGuide'), 5.5);
     }
   }
   bellyEl.style.width = Math.min(100, belly.value) + '%';
@@ -697,8 +697,8 @@ function loop() {
   creatures.update(dt, whale.group.position, st.yaw, Z);
   spout.setView(renderer, camera);
   fish.setView(renderer);
-  // タイトルなどの間は、左のダイアログに隠れないよう、クジラが画面の右寄りに映るようにカメラをずらす（スマホ縦画面では中央）
-  const titleOffset = (game.mode === 'play' || innerWidth <= 680) ? 0 : -7 * Z.V;
+  // タイトルなどの間は、左のダイアログに隠れないよう、クジラが画面の右寄りに映るようにカメラをずらす（閲覧モードやスマホ縦画面では中央）
+  const titleOffset = (game.mode === 'play' || game.mode === 'watch' || innerWidth <= 680) ? 0 : -7 * Z.V;
   camAim.copy(whale.group.position).addScaledVector(camRight, titleOffset);
   camTarget.lerp(camAim, Math.min(1, dt * 1.5));
   camTarget.y = SEA.depth; // 呼吸で浮いてもカメラは上下させない

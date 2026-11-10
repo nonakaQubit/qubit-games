@@ -119,6 +119,7 @@ export class UI {
   hideAll() {
     clearTimeout(this.cornerT);
     this._stopDexViewer();
+    if (this._watchHintEl) this._watchHintEl.style.display = 'none';
     this.panels.forEach((p) => p.classList.remove('show', 'corner'));
     this.ending.classList.remove('show');
   }
@@ -286,6 +287,44 @@ export class UI {
     }
   }
 
+  // 閲覧モード：タイトルダイアログを消して背景の海と泳ぐクジラをフル画面で眺める
+  showWatch(onReturn) {
+    this.hideAll();
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!this._watchHintEl) {
+      const hint = document.createElement('div');
+      hint.id = 'ui-watch-hint';
+      hint.style.cssText = 'position:fixed;bottom:22px;right:24px;background:rgba(8,28,32,0.65);backdrop-filter:blur(5px);' +
+        'border:1px solid rgba(255,255,255,0.22);border-radius:20px;padding:8px 18px;color:#e8f0ee;font-size:13px;' +
+        'letter-spacing:0.04em;pointer-events:auto;cursor:pointer;user-select:none;z-index:40;transition:opacity .4s;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+      document.body.appendChild(hint);
+      this._watchHintEl = hint;
+    }
+    this._watchHintEl.textContent = isTouch ? `◀ ${t('watchHintTouch')}` : `◀ ${t('watchHint')}`;
+    this._watchHintEl.style.display = 'block';
+    this._watchHintEl.style.opacity = '1';
+
+    let exited = false;
+    const exitWatch = (e) => {
+      if (exited) return;
+      exited = true;
+      if (e) e.stopPropagation();
+      window.removeEventListener('click', exitWatch, true);
+      window.removeEventListener('touchend', exitWatch, true);
+      if (this._watchHintEl) this._watchHintEl.style.display = 'none';
+      onReturn();
+    };
+
+    this._watchHintEl.onclick = exitWatch;
+    // 即時発火しないよう少し待ってから画面全体のクリック/タップでも戻れるようにする
+    setTimeout(() => {
+      if (!exited) {
+        window.addEventListener('click', exitWatch, { once: true, capture: true });
+        window.addEventListener('touchend', exitWatch, { once: true, capture: true });
+      }
+    }, 220);
+  }
+
   // タイトル：海域の選択、はじめる、図鑑、権利とウンチク、言語
   showTitle(data, selected) {
     this.hideAll();
@@ -301,7 +340,11 @@ export class UI {
       const b = el('button', 'ui-btn ui-stage' + (a.id === selected ? ' sel' : ''), row);
       b.innerHTML = `${t('area.' + a.id)}<small>${data.cleared.includes(a.id) ? t('cleared') : unlocked ? '' : t('locked')}</small>`;
       b.disabled = !unlocked;
-      b.onclick = () => this.showTitle(data, a.id);
+      b.onclick = () => {
+        if (a.id === selected) return;
+        if (this.h.onSelectArea) this.h.onSelectArea(a.id);
+        else this.showTitle(data, a.id);
+      };
     });
 
     const go = el('div', 'ui-row', p);
@@ -309,6 +352,9 @@ export class UI {
     const start = el('button', 'ui-btn main', go);
     start.textContent = t('start');
     start.onclick = () => this.h.onStart(selected);
+    const watch = el('button', 'ui-btn', go);
+    watch.textContent = t('watch');
+    watch.onclick = () => this.h.onWatch ? this.h.onWatch(selected) : null;
     const dex = el('button', 'ui-btn', go);
     dex.textContent = t('dex');
     dex.onclick = () => this.showDex(data, () => this.showTitle(data, selected));

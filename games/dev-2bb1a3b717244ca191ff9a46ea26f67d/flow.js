@@ -90,7 +90,7 @@ export function setupFlow(ctx) {
       data.area = id;
       save(data);
       applyArea(areaById(id));
-      belly.value = 15; belly.full = false;
+      belly.value = 30; belly.full = false;
       see(game.area.whale); // 自分のクジラは、はじめから見たことにする
       game.mode = 'play';
       game.cleared = false;
@@ -106,6 +106,23 @@ export function setupFlow(ctx) {
 
   const ui = new UI({
     onStart: (id) => startArea(id),
+    onSelectArea: (id) => {
+      if (game.area.id === id) return;
+      blackout(() => {
+        data.area = id;
+        save(data);
+        applyArea(areaById(id));
+        ui.showTitle(data, id);
+      });
+    },
+    onWatch: () => {
+      game.mode = 'watch';
+      setHud(false);
+      ui.showWatch(() => {
+        game.mode = 'title';
+        toTitle();
+      });
+    },
     onLang: (id) => { setLang(id); data.lang = id; save(data); refreshTexts(); },
     onResume: () => {
       game.mode = 'play';
@@ -126,6 +143,7 @@ export function setupFlow(ctx) {
     if (e.code !== 'Escape') return;
     if (game.mode === 'play') { game.mode = 'menu'; ui.showMenu(); }
     else if (game.mode === 'menu') { game.mode = 'play'; ui.hideAll(); }
+    else if (game.mode === 'watch') { game.mode = 'title'; toTitle(); }
   });
 
   // マウスを生き物に重ねてしばらくすると、図鑑のカードを出す（クリックは突進のまま）
