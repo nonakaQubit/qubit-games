@@ -391,6 +391,7 @@ export class FishSchools {
 
     for (let s = 0; s < SCHOOLS; s++) {
       const school = this.schools[s];
+      const F = school.species ?? this.food;
       if (school.center.distanceTo(whalePos) > FAR * this.Z.V) { this._respawnFar(s, whalePos, heading); continue; }
       if (school.alive < school.size * LEFTOVER) {
         school.leftT += dt;
@@ -409,7 +410,11 @@ export class FishSchools {
                 vel[i * 3 + 2] += (dz / len) * (F.maxSpeed * 2.5);
               }
             }
-            window.onSchoolCleared?.(school.center, school.species);
+            try {
+              window.onSchoolCleared?.(school.center, school.species);
+            } catch (err) {
+              console.warn('onSchoolCleared error:', err);
+            }
           }
         }
         if (school.leftT > scatterWait) school.fade = Math.max(0, school.fade - dt / FADE_TIME);
@@ -418,7 +423,6 @@ export class FishSchools {
 
       _v.subVectors(school.target, school.center);
       if (_v.length() < 3) this._newTarget(school);
-      const F = school.species ?? this.food;
       school.vel.lerp(_v.setLength(F.cruise), dt * 0.5);
       _v.subVectors(school.center, whalePos);
       const dw = _v.length();

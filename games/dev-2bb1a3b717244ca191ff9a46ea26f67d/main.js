@@ -722,21 +722,25 @@ window.__debug = { whale, st, sfx, spout, camera, game };
 
 // 群れ完食時のマイクロ報酬演出ハンドラ
 window.onSchoolCleared = (schoolPos, species) => {
-  if (!playing) return;
-  // 1. クジラから小さな喜びの光の粒をふわっと放出
-  if (spout?.emitWhaleJoy) {
-    spout.emitWhaleJoy(whale.group, Z.S, 18);
-  }
-  // 2. 控えめな泡のさざ波
-  if (spout?.emitSplash) {
-    spout.emitSplash(schoolPos, Z.S * 0.4, 15);
-  }
-  // 3. 画面中央上部の控えめなトースト表示
-  const toast = document.getElementById('clearToast');
-  if (toast) {
-    toast.textContent = '群れを捕食完了';
-    toast.style.opacity = '0.9';
-    clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 1600);
+  try {
+    if (game?.mode !== 'play') return;
+    // 1. クジラから小さな喜びの光の粒をふわっと放出
+    if (spout?.emitWhaleJoy && whale?.group) {
+      spout.emitWhaleJoy(whale.group, Z.S, 18);
+    }
+    // 2. 控えめな泡のさざ波
+    if (spout?.emitSplash && schoolPos) {
+      spout.emitSplash(schoolPos, Z.S * 0.4, 15);
+    }
+    // 3. 画面中央上部の控えめなトースト表示
+    const toast = document.getElementById('clearToast');
+    if (toast) {
+      toast.textContent = '群れを捕食完了';
+      toast.style.opacity = '0.9';
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 1600);
+    }
+  } catch (e) {
+    console.warn('onSchoolCleared error:', e);
   }
 };
