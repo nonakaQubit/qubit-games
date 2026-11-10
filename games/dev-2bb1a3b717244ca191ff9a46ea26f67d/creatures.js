@@ -66,10 +66,14 @@ export class OceanCreatures {
       const { group, flukeGroup, animate } = builder(idx);
       this.group.add(group);
 
+      const scale = 0.90 + Math.random() * 0.22;
+      group.scale.setScalar(scale);
+
       const spec = CREATURE_SPECS[type] ?? CREATURE_SPECS.shark;
       const item = {
         type,
         spec,
+        scale,
         group,
         flukeGroup,
         animate,
@@ -136,6 +140,9 @@ export class OceanCreatures {
   _spawnItem(it, playerPos, playerYaw, Z) {
     const { type, spec } = it;
     it.active = true;
+    const scale = 0.90 + Math.random() * 0.22;
+    it.scale = scale;
+    it.group.scale.setScalar(scale);
     const baseDepth = spec.scaleZ ? spec.depth * Z.S : spec.depth;
 
     if (type === 'humpback') {

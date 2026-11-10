@@ -71,8 +71,8 @@ export class WhalePod {
       slim = randRange(0.93, 1.03);
       deep = randRange(1.03, 1.09);
     } else {
-      // 90%〜 の仲間クジラ（自分1.0より少し控えめな標準成体）
-      sizeScale = randRange(0.90, 0.95);
+      // 82〜88% の仲間クジラ（自分1.0より確実に一回り控えめな標準成体）
+      sizeScale = randRange(0.82, 0.88);
       headWide = baseSpecies.headWide ?? 1.0;
       eye = baseSpecies.eye ?? 1.0;
       uShapeHead = baseSpecies.uShapeHead ?? false;
@@ -248,6 +248,14 @@ export class WhalePod {
         open: 0,
         breathT: -1,
         sinceBreath: isCalf ? randRange(3, 18) : randRange(4, 28),
+        breachT: -1,
+        breachTimer: isCalf ? randRange(40, 75) : randRange(60, 110),
+        breachType: 0,
+        breachSpeed0: 0,
+        breachY0: 0,
+        breachPitch0: 0,
+        breachRoll0: 0,
+        roll: 0,
         replyTimer: -1,
         autoCallTimer: isCalf ? randRange(10, 30) : randRange(14, 42),
         mode: startInFormation ? 'formation' : 'free',
@@ -472,44 +480,112 @@ export class WhalePod {
         st.gulp = Math.max(0, st.gulp - dt * 0.8);
       }
 
-      // 加速
-      st.speed += (st.targetSpeed - st.speed) * Math.min(1, dt * 1.6);
+      // 仲間のブリーチング（気まぐれに海面を突き破って大ジャンプ）
+      st.breachTimer -= dt;
+      if (st.breachTimer <= 0 && st.breachT < 0 && st.lungeT < 0 && st.breathT < 0) {
+        st.breachT = 0;
+        st.breachTimer = st.isCalf ? randRange(45, 85) : randRange(65, 120);
+        st.breachType = Math.floor(Math.random() * 3);
+        st.breachSpeed0 = st.speed;
+        st.breachY0 = p.y;
+        st.breachRoll0 = -st.smoothYawRate * 0.7;
+        st.breachPitch0 = st.pitch;
+        whale.startStroke();
+      }
+
+      const isBreaching = st.breachT >= 0;
+
+      // 加速と位置更新
+      if (!isBreaching) {
+        st.speed += (st.targetSpeed - st.speed) * Math.min(1, dt * 1.6);
+      }
       p.x += Math.sin(st.yaw) * st.speed * dt;
       p.z += Math.cos(st.yaw) * st.speed * dt;
 
-      // 呼吸（息つぎ）：35〜55秒ごとに浮上して潮を吹く
-      st.sinceBreath += dt;
-      if (st.sinceBreath > 36 && st.breathT < 0 && st.lungeT < 0) {
-        st.breathT = 0;
-      }
+      if (isBreaching) {
+        st.breachT += dt;
+        const s0 = st.breachSpeed0 ?? st.speed;
+        const RUN_T = 1.05 * Z.T;
+        const AIR_T = 1.65 * Z.T;
+        const TOTAL_T = RUN_T + AIR_T;
 
-      let riseTarget = 0;
-      if (st.spoutT >= 0) st.spoutT += dt;
-      if (st.breathT >= 0) {
-        st.breathT += dt;
-        if (st.breathT < 1.8 * Z.T) riseTarget = 2.3 * Z.S;
-        if (!st.spouted && p.y > this.depth + 1.2 * Z.S) {
-          st.spouted = true;
-          st.spoutT = 0;
-          this.spout.emit((v) => whale.blowholeWorld(v), Z.S);
-        }
-        if (st.breathT > 5 * Z.T) {
-          st.breathT = -1;
+        const yEntry = -0.45 * Math.pow(Z.S, 0.72);
+        const yExit = -0.60 * Math.pow(Z.S, 0.72);
+        const arcH = 1.25 + 0.12 * Z.S;
+        const yStart = st.breachY0 ?? this.depth;
+        const bRoll0 = st.breachRoll0 || 0;
+
+        if (st.breachT < RUN_T) {
+          // 1. 水中助走加速
+          const u = st.breachT / RUN_T;
+          st.speed = s0 + (9.5 * Z.P - s0) * Math.pow(u, 1.2);
+          p.y = yStart + (yEntry - yStart) * Math.pow(u, 2.0);
+          st.pitch = THREE.MathUtils.lerp(st.breachPitch0, 0.35, u);
+          st.roll = bRoll0;
+        } else if (st.breachT < TOTAL_T) {
+          // 2. 空中跳躍（放物線）
+          const jNorm = (st.breachT - RUN_T) / AIR_T;
+          p.y = yEntry * (1 - jNorm) + yExit * jNorm + 4 * arcH * jNorm * (1 - jNorm);
+          const vyAir = ((yExit - yEntry) + 4 * arcH * (1 - 2 * jNorm)) / AIR_T;
+          st.pitch = Math.atan2(vyAir, Math.max(st.speed, 3.5 * Z.P));
+
+          // 水面突破白波トレイル
+          const aheadPos = new THREE.Vector3(p.x + Math.sin(st.yaw) * 2.2 * Z.S, 0.1, p.z + Math.cos(st.yaw) * 2.2 * Z.S);
+          this.spout.emitWake(aheadPos, Z.S, 1);
+
+          // アクションに応じたロール
+          if (st.breachType === 0) {
+            st.roll = THREE.MathUtils.lerp(bRoll0, bRoll0 + Math.PI * 1.1, jNorm);
+          } else if (st.breachType === 1) {
+            st.roll = THREE.MathUtils.lerp(bRoll0, 0.65, jNorm);
+          } else {
+            st.roll = THREE.MathUtils.lerp(bRoll0, 0, jNorm);
+          }
+        } else {
+          // 3. 着水：大飛沫を放って通常遊泳へ復帰
+          this.spout.emitSplash(p, Z.S * 0.9, 65);
+          st.breachT = -1;
           st.sinceBreath = 0;
-          st.spouted = false;
+          st.vy = -2.5 * Z.P;
+          st.speed = 5.5 * Z.P;
+          st.roll = 0;
         }
+      } else {
+        // 通常の呼吸・浮上バネ計算
+        st.sinceBreath += dt;
+        if (st.sinceBreath > 36 && st.breathT < 0 && st.lungeT < 0) {
+          st.breathT = 0;
+        }
+
+        let riseTarget = 0;
+        if (st.spoutT >= 0) st.spoutT += dt;
+        if (st.breathT >= 0) {
+          st.breathT += dt;
+          if (st.breathT < 1.8 * Z.T) riseTarget = 2.3 * Z.S;
+          if (!st.spouted && p.y > this.depth + 1.2 * Z.S) {
+            st.spouted = true;
+            st.spoutT = 0;
+            this.spout.emit((v) => whale.blowholeWorld(v), Z.S);
+          }
+          if (st.breathT > 5 * Z.T) {
+            st.breathT = -1;
+            st.sinceBreath = 0;
+            st.spouted = false;
+          }
+        }
+
+        const targetDepth = this.depth + (st.depthOffset ?? 0);
+        st.riseGoal += (riseTarget - st.riseGoal) * Math.min(1, dt * 1.5 / Z.T);
+        const K = 5 / (Z.T * Z.T), C = 2 * Math.sqrt(K);
+        st.vy += (K * (targetDepth + st.riseGoal - p.y) - C * st.vy) * dt;
+        p.y += st.vy * dt;
+
+        const pitchTarget = Math.max(-0.25, Math.min(0.25, st.vy / Math.max(st.speed, 2 * Z.P) * 0.5));
+        st.pitch += (pitchTarget - st.pitch) * Math.min(1, dt * 2);
+        st.roll = -st.smoothYawRate * 0.7;
       }
 
-      const targetDepth = this.depth + (st.depthOffset ?? 0);
-      st.riseGoal += (riseTarget - st.riseGoal) * Math.min(1, dt * 1.5 / Z.T);
-      const K = 5 / (Z.T * Z.T), C = 2 * Math.sqrt(K);
-      st.vy += (K * (targetDepth + st.riseGoal - p.y) - C * st.vy) * dt;
-      p.y += st.vy * dt;
-
-      const pitchTarget = Math.max(-0.25, Math.min(0.25, st.vy / Math.max(st.speed, 2 * Z.P) * 0.5));
-      st.pitch += (pitchTarget - st.pitch) * Math.min(1, dt * 2);
-      // 平滑化した smoothYawRate で自然にロール
-      whale.group.rotation.set(-st.pitch, st.yaw, -st.smoothYawRate * 0.7);
+      whale.group.rotation.set(-st.pitch, st.yaw, st.roll ?? 0);
 
       whale.group.updateMatrixWorld();
       whale.animate(dt, st.speed, st.gulp, st.open);

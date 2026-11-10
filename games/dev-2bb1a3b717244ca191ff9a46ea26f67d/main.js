@@ -383,6 +383,13 @@ function updateWhale(dt) {
         st.autoLunge = st.autoT;
       }
     }
+
+    // 鑑賞モード中の気まぐれなブリーチング（45〜70秒に1回程度、水面へ向かって大ジャンプ）
+    st.autoBreachTimer = (st.autoBreachTimer ?? (35 + Math.random() * 30)) - dt;
+    if (st.autoBreachTimer <= 0 && st.lungeT < 0 && st.breathT < 0) {
+      breachReq = true;
+      st.autoBreachTimer = 45 + Math.random() * 25;
+    }
   }
 
   // 突進：後ろ半身を反らせて尾びれを振り上げ、打ち下ろして加速 → 口を大きく開ける →
