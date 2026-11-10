@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Whale } from './whale.js?v=20261109_v44';
-import { FishSchools } from './fish.js?v=20261107_v37';
+import { FishSchools } from './fish.js?v=20261110_fix1';
 import { Sea } from './sea.js?v=20261109_v41';
 import { Spout } from './spout.js?v=20261107_v36';
 import { WhaleVoice, SoundRings, SoundIndicator, SoundEffects } from './voice.js?v=20261107_v36';
