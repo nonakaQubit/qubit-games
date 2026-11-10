@@ -154,10 +154,10 @@ export class WhalePod {
       let side = 0, fwd = 0;
       for (let attempt = 0; attempt < 25; attempt++) {
         if (isCalf) {
-          // 子クジラ：母親のすぐ脇（胸びれ横〜少し後方のエスコート位置）に初期配置
+          // 子クジラ：近すぎず視界や進路を邪魔しない適度な距離に初期配置
           const sign = Math.random() < 0.5 ? 1 : -1;
-          side = sign * randRange(2.8, 3.8);
-          fwd = randRange(-1.6, 0.4);
+          side = sign * randRange(3.8, 6.2);
+          fwd = randRange(-2.5, 1.8);
         } else if (i === 0) {
           // 仲間クジラ1頭目：視界に入りやすい前方〜斜め横
           const sign = Math.random() < 0.5 ? 1 : -1;
@@ -171,15 +171,15 @@ export class WhalePod {
           fwd = Math.cos(angle) * dist;
         }
         // プレイヤー自身（0,0）および既に配置した仲間との距離が十分離れているか確認
-        const minPlayerDist = isCalf ? 2.2 : 4.0;
+        const minPlayerDist = isCalf ? 3.0 : 4.0;
         const okPlayer = Math.hypot(side, fwd) > minPlayerDist;
-        const okOthers = placedOffsets.every((o) => Math.hypot(side - o.side, fwd - o.fwd) > (isCalf ? 2.8 : 4.5));
+        const okOthers = placedOffsets.every((o) => Math.hypot(side - o.side, fwd - o.fwd) > (isCalf ? 3.2 : 4.5));
         if (okPlayer && okOthers) break;
       }
       placedOffsets.push({
         side,
         fwd,
-        depthOffset: isCalf ? randRange(-0.15, 0.15) : randRange(-0.32, 0.22),
+        depthOffset: isCalf ? randRange(-0.18, 0.18) : randRange(-0.32, 0.22),
       });
     }
 
@@ -205,26 +205,26 @@ export class WhalePod {
       whale.trail.length = 0;
 
       // 開始時点の連携関係：
-      // 子クジラは最初から母親に寄り添って並走（formation）。仲間クジラは55%で並走、45%で自由回遊
-      const startInFormation = isCalf ? true : (Math.random() < 0.55);
+      // 子クジラも仲間と同様に50〜55%で並走、残りは自由回遊（常時追従はしない）
+      const startInFormation = Math.random() < 0.52;
       const initialYawOffset = startInFormation
-        ? randRange(-0.12, 0.12)
+        ? randRange(-0.15, 0.15)
         : randRange(-0.75, 0.75);
 
       const preferredSide = off.side >= 0 ? 1 : -1;
-      // 並走時の希望ポジション
-      // 子クジラ：母親のすぐ脇（2.8〜3.8m）で、胸鰭〜胴体横（-1.8〜0.2m）のエスコート位置
-      // 仲間クジラ：ゆったりした並走間隔（4.6〜8.2m）
+      // 並走時の希望ポジション（プレイヤーの邪魔にならない適度な間隔）
+      // 子クジラ：3.8〜5.8m（プレイヤーの餌や進行を塞がない）
+      // 仲間クジラ：4.6〜8.2m
       const formSideDist = isCalf
-        ? preferredSide * randRange(2.8, 3.8)
+        ? preferredSide * randRange(3.8, 5.8)
         : preferredSide * randRange(4.6, 8.2);
       const formFwdDist = isCalf
-        ? randRange(-1.8, 0.2)
+        ? randRange(-3.5, 0.5)
         : randRange(-7.0, 5.5);
 
-      // 個体ごとの協調性（プレイヤーの近くでどれくらい並走に入りやすいか）
-      // 子クジラは母から離れず強く寄り添う（0.05〜0.09）
-      const cohesion = isCalf ? randRange(0.05, 0.09) : randRange(0.008, 0.026);
+      // 個体ごとの協調性（プレイヤーの近くで並走に入りやすいか）
+      // 子クジラは「多少追従しやすい程度」（0.025〜0.045）、仲間成体は 0.008〜0.026
+      const cohesion = isCalf ? randRange(0.025, 0.045) : randRange(0.008, 0.026);
 
       const st = {
         id: i,
@@ -247,11 +247,11 @@ export class WhalePod {
         gulp: 0,
         open: 0,
         breathT: -1,
-        sinceBreath: isCalf ? randRange(2, 16) : randRange(4, 28),
+        sinceBreath: isCalf ? randRange(3, 18) : randRange(4, 28),
         replyTimer: -1,
-        autoCallTimer: isCalf ? randRange(8, 24) : randRange(14, 42),
+        autoCallTimer: isCalf ? randRange(10, 30) : randRange(14, 42),
         mode: startInFormation ? 'formation' : 'free',
-        modeTimer: isCalf ? randRange(25, 45) : (startInFormation ? randRange(6, 18) : randRange(8, 22)),
+        modeTimer: startInFormation ? randRange(7, 16) : randRange(10, 24),
         preferredSide,
         formSideDist,
         formFwdDist,
@@ -268,11 +268,15 @@ export class WhalePod {
     for (const m of this.members) {
       const d = m.whale.group.position.distanceTo(playerPos);
       if (d < 110 * this.Z.V && m.st.replyTimer < 0) {
-        m.st.replyTimer = 0.7 + Math.random() * 1.5;
-        // プレイヤーが鳴いて呼びかけると、自由回遊中の仲間も高確率で引き寄せられて並走モードに入る
-        if (m.st.mode === 'free' && Math.random() < 0.65) {
+        // 子クジラは少し早めに返答（甘えたような早い鳴き返し）
+        m.st.replyTimer = m.st.isCalf ? (0.4 + Math.random() * 0.7) : (0.7 + Math.random() * 1.5);
+        // 声をかけられたら追従しやすい：
+        // 子クジラは呼ばれると高確率（85%）で並走に入り、母クジラのもとへ泳ぎ寄ってくる
+        // 成体の仲間も 50% 程度でゆったり並走に入る
+        const joinProb = m.st.isCalf ? 0.85 : 0.50;
+        if (Math.random() < joinProb) {
           m.st.mode = 'formation';
-          m.st.modeTimer = randRange(10, 20);
+          m.st.modeTimer = m.st.isCalf ? randRange(14, 25) : randRange(8, 18);
         }
       }
     }
@@ -348,24 +352,14 @@ export class WhalePod {
         // ---- プレイ中 ----
         if (st.mode === 'formation') {
           if (st.modeTimer <= 0) {
-            if (st.isCalf) {
-              // 子クジラは母から離れず、隊列を維持したまま寄り添う位置を少し微調整する程度
-              st.modeTimer = randRange(20, 40);
-              if (Math.random() < 0.25) {
-                // たまに逆サイドの脇へ回り込む
-                st.preferredSide = -st.preferredSide;
-                st.formSideDist = st.preferredSide * randRange(2.8, 3.8);
-              }
-            } else {
-              // 隊列を解消して、自由気ままな回遊へ（次回並走時のポジションも少しランダムに更新）
-              st.mode = 'free';
-              st.modeTimer = randRange(12, 26);
-              st.preferredSide = Math.random() < 0.5 ? 1 : -1;
-              st.formSideDist = st.preferredSide * randRange(4.6, 8.2);
-              st.formFwdDist = randRange(-7.0, 5.5);
-            }
+            // 隊列を解消して、自由気ままな回遊へ（子クジラも常時追従せず海を泳ぎ回る）
+            st.mode = 'free';
+            st.modeTimer = randRange(12, 26);
+            st.preferredSide = Math.random() < 0.5 ? 1 : -1;
+            st.formSideDist = st.preferredSide * (st.isCalf ? randRange(3.8, 5.8) : randRange(4.6, 8.2));
+            st.formFwdDist = st.isCalf ? randRange(-3.5, 0.5) : randRange(-7.0, 5.5);
           } else {
-            // 個体ごとのランダムな並走スロット位置
+            // 個体ごとの並走スロット位置（邪魔にならない適度な間隔）
             const sideDist = st.formSideDist * this.Z.V;
             const fwdDist = st.formFwdDist * this.Z.V;
             const tx = playerPos.x + rightX * sideDist + fwdX * fwdDist;
@@ -380,9 +374,8 @@ export class WhalePod {
             const dForm = Math.hypot(tx - p.x, tz - p.z);
             desiredSpeed = playerSpeed;
             if (st.isCalf) {
-              // 子クジラは母の速度に合わせて遅れずについていく
-              if (dForm > 2.5 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.3, 3.2 * Z.P);
-              else if (dForm < 1.0 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.9, 1.4 * Z.P);
+              if (dForm > 3.0 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.25, 3.0 * Z.P);
+              else if (dForm < 1.2 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.9, 1.4 * Z.P);
             } else {
               if (dForm > 4 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.25, 3.0 * Z.P);
               else if (dForm < 1.5 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.88, 1.2 * Z.P);
@@ -393,18 +386,22 @@ export class WhalePod {
           const wave = Math.sin(st.autoT * 0.16 + st.id * 2.1) * 0.5 + Math.sin(st.autoT * 0.05) * 0.3;
           targetYaw = st.yaw + wave * dt;
 
-          // プレイヤーが仲間クジラの近くに寄ってきたとき、個体ごとの協調性（cohesion）に応じて並走を組む
-          const triggerDist = st.isCalf ? 16 * this.Z.V : 12 * this.Z.V;
-          if (distToPlayer < triggerDist && (st.isCalf || (st.modeTimer < 10 && Math.random() < st.cohesion))) {
+          // プレイヤーが仲間クジラの近く（12m 以内）に寄ってきたとき、個体ごとの協調性（cohesion）に応じて並走を組む
+          // （子クジラは少し並走に入りやすい程度で、常時くっつくことはない）
+          if (distToPlayer < 12 * this.Z.V && st.modeTimer < 10 && Math.random() < st.cohesion) {
             st.mode = 'formation';
-            st.modeTimer = st.isCalf ? randRange(25, 45) : randRange(8, 18);
+            st.modeTimer = st.isCalf ? randRange(10, 20) : randRange(8, 16);
           }
 
           // 近く（15m 以内）に魚の群れがあれば、たまに食事モードへ
-          if (st.lungeT < 0 && st.breathT < 0 && Math.random() < 0.022) {
+          // ※プレイヤーが狙っている獲物を横取りしないよう、プレイヤーから十分離れた（24m 以上）群れのみ対象
+          // ※子クジラはまだ授乳・真似事のため群れを襲わない
+          if (!st.isCalf && st.lungeT < 0 && st.breathT < 0 && Math.random() < 0.02) {
             if (this.fish && this.fish.schools) {
               for (const sc of this.fish.schools) {
-                if (sc.alive > sc.size * 0.25 && p.distanceTo(sc.center) < 15 * this.Z.V) {
+                const distToWhale = p.distanceTo(sc.center);
+                const distToPlayerSchool = playerPos.distanceTo(sc.center);
+                if (sc.alive > sc.size * 0.25 && distToWhale < 15 * this.Z.V && distToPlayerSchool > 24 * this.Z.V) {
                   st.mode = 'feed';
                   st.feedTarget = sc.center;
                   st.modeTimer = 5.0;
@@ -416,18 +413,13 @@ export class WhalePod {
           }
 
           // プレイヤーから離れすぎたら、自然にプレイヤーのいる海域へ旋回して戻る（ワープはしない）
-          const maxDist = st.isCalf ? 16 * this.Z.V : 34 * this.Z.V;
-          if (distToPlayer > maxDist) {
+          if (distToPlayer > 34 * this.Z.V) {
             const toPlayerYaw = Math.atan2(playerPos.x - p.x, playerPos.z - p.z);
             let diff = toPlayerYaw - st.yaw;
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
             targetYaw = st.yaw + diff * 0.6;
-            desiredSpeed = Math.max(playerSpeed * 1.25, 3.2 * Z.P);
-            if (st.isCalf) {
-              st.mode = 'formation';
-              st.modeTimer = randRange(20, 35);
-            }
+            desiredSpeed = Math.max(playerSpeed * 1.2, 3.2 * Z.P);
           }
         } else if (st.mode === 'feed') {
           if (st.modeTimer <= 0 || st.lungeT < 0 || !st.feedTarget) {
@@ -526,10 +518,8 @@ export class WhalePod {
       whale.group.updateMatrixWorld();
       whale.animate(dt, st.speed, st.gulp, st.open);
 
-      if (st.open > 0.1 && this.fish) {
-        const inv = new THREE.Matrix4().copy(whale.group.matrixWorld).invert();
-        this.fish.eatGape(inv, whale.mouthGape(st.open));
-      }
+      // 仲間クジラは豪快な突進・捕食アクション（開口・喉袋の膨らみ・急加速）の演出を行うが、
+      // プレイヤーの餌（完食ボーナスやスコア）を横取りして減らさないよう、魚のalive減少判定（eatGape）は行わない
     }
   }
 }
