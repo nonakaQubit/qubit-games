@@ -22,7 +22,7 @@ const CSS = `
 .ui-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
   background: rgba(8, 28, 32, 0.78); backdrop-filter: blur(5px); border: 1px solid #ffffff22;
   border-radius: 14px; padding: 22px 26px; min-width: 340px; max-width: 580px; color: #e8f0ee;
-  box-shadow: 0 10px 40px #0007; display: none; max-height: 92vh; overflow-y: auto; }
+  box-shadow: 0 10px 40px #0007; display: none; max-height: 92vh; overflow-y: auto; z-index: 60; }
 .ui-panel.show { display: block; }
 .ui-panel.corner { left: auto; top: auto; right: 18px; bottom: 36px; transform: none; min-width: 0;
   padding: 14px 16px; } /* クリア後、しばらくしたら隅へ寄せて、そのまま泳ぎ続けられるように */

@@ -108,11 +108,11 @@ export function setupFlow(ctx) {
     onStart: (id) => startArea(id),
     onSelectArea: (id) => {
       if (game.area.id === id) return;
+      ui.showTitle(data, id);
       blackout(() => {
         data.area = id;
         save(data);
         applyArea(areaById(id));
-        ui.showTitle(data, id);
       });
     },
     onWatch: () => {

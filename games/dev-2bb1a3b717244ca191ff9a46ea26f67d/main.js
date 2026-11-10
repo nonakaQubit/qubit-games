@@ -322,12 +322,67 @@ function updateWhale(dt) {
     }
   }
   if (!playing && !isBreaching) {
-    // タイトルなどの間は勝手に泳ぐ：ゆっくり向きを変えながら、前に群れがあればときどき突っ込む
+    // 鑑賞モード・タイトル画面：直進性を高く保ちつつ、魚の群れを探して捕食する索餌AI
     st.autoT = (st.autoT || 0) + dt;
-    targetYaw = st.yaw + Math.sin(st.autoT * 0.23) * 0.5 + Math.sin(st.autoT * 0.071) * 0.4;
-    targetSpeed = 2.2 * Z.P;
-    ahead.set(p.x + Math.sin(st.yaw) * 7 * Z.V, fish.layerY, p.z + Math.cos(st.yaw) * 7 * Z.V);
-    if (st.lungeT < 0 && st.autoT - (st.autoLunge || 0) > 9 && fish.near(ahead, 3 * Z.V)) { lungeReq = true; st.autoLunge = st.autoT; }
+    if (st.baseYaw === undefined) st.baseYaw = st.yaw;
+
+    // 索餌ターゲットの探索（前方120度、12〜45mにある生きた群れ）
+    let bestSchool = null;
+    let bestDist = Infinity;
+    if (fish && fish.schools) {
+      for (const sc of fish.schools) {
+        if (sc.alive <= sc.size * 0.25) continue;
+        const dx = sc.center.x - p.x;
+        const dz = sc.center.z - p.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 45 * Z.V || dist < 2.0) continue;
+
+        // クジラの進行方向との角度差
+        const angleToSchool = Math.atan2(dx, dz);
+        let angleDiff = angleToSchool - st.yaw;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+        // 前方扇状（±80度以内）にある群れを優先して選定
+        if (Math.abs(angleDiff) < 1.4 && dist < bestDist) {
+          bestDist = dist;
+          bestSchool = sc;
+        }
+      }
+    }
+
+    if (bestSchool && st.lungeT < 0) {
+      // 索餌行動：群れの方向へ緩やかな大きな弧を描いて進路を向ける
+      const dx = bestSchool.center.x - p.x;
+      const dz = bestSchool.center.z - p.z;
+      const targetAngle = Math.atan2(dx, dz);
+      let diff = targetAngle - st.baseYaw;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      st.baseYaw += diff * Math.min(1, dt * 0.7);
+      targetYaw = st.baseYaw;
+      targetSpeed = 2.4 * Z.P;
+
+      // 群れに近づいたら（6〜9m）豪快に突進・捕食！
+      if (bestDist < 8.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+        lungeReq = true;
+        st.autoLunge = st.autoT;
+        // 捕食後、次に進む大まかな進路を少しオフセット
+        st.baseYaw += (Math.random() - 0.5) * 0.8;
+      }
+    } else {
+      // 通常巡航：広大な海を雄大に直進（わずかな自然のうねり波のみ）
+      const wander = Math.sin(st.autoT * 0.05) * 0.12;
+      targetYaw = st.baseYaw + wander;
+      targetSpeed = 2.0 * Z.P;
+
+      // 前方至近距離に群れがあれば即座に突進
+      ahead.set(p.x + Math.sin(st.yaw) * 6 * Z.V, fish.layerY, p.z + Math.cos(st.yaw) * 6 * Z.V);
+      if (st.lungeT < 0 && st.autoT - (st.autoLunge || 0) > 8 && fish.near(ahead, 3.5 * Z.V)) {
+        lungeReq = true;
+        st.autoLunge = st.autoT;
+      }
+    }
   }
 
   // 突進：後ろ半身を反らせて尾びれを振り上げ、打ち下ろして加速 → 口を大きく開ける →
