@@ -272,21 +272,29 @@ export class WhalePod {
     }
   }
 
-  onPlayerCall(playerPos) {
+  onPlayerCall(playerPos, isWatch = false) {
+    let closestM = null, closestDist = Infinity;
     for (const m of this.members) {
       const d = m.whale.group.position.distanceTo(playerPos);
-      if (d < 110 * this.Z.V && m.st.replyTimer < 0) {
-        // 子クジラは少し早めに返答（甘えたような早い鳴き返し）
-        m.st.replyTimer = m.st.isCalf ? (0.4 + Math.random() * 0.7) : (0.7 + Math.random() * 1.5);
-        // 声をかけられたら追従しやすい：
-        // 子クジラは呼ばれると高確率（85%）で並走に入り、母クジラのもとへ泳ぎ寄ってくる
-        // 成体の仲間も 50% 程度でゆったり並走に入る
-        const joinProb = m.st.isCalf ? 0.85 : 0.50;
-        if (Math.random() < joinProb) {
-          m.st.mode = 'formation';
-          m.st.modeTimer = m.st.isCalf ? randRange(14, 25) : randRange(8, 18);
+      if (d < 110 * this.Z.V) {
+        if (d < closestDist) { closestDist = d; closestM = m; }
+        if (!isWatch && m.st.replyTimer < 0) {
+          // 子クジラは少し早めに返答（甘えたような早い鳴き返し）
+          m.st.replyTimer = m.st.isCalf ? (0.4 + Math.random() * 0.7) : (0.7 + Math.random() * 1.5);
+          // 声をかけられたら追従しやすい：
+          // 子クジラは呼ばれると高確率（85%）で並走に入り、母クジラのもとへ泳ぎ寄ってくる
+          // 成体の仲間も 50% 程度でゆったり並走に入る
+          const joinProb = m.st.isCalf ? 0.85 : 0.50;
+          if (Math.random() < joinProb) {
+            m.st.mode = 'formation';
+            m.st.modeTimer = m.st.isCalf ? randRange(14, 25) : randRange(8, 18);
+          }
         }
       }
+    }
+    // 鑑賞モード中のプレイヤー呼びかけ時は、一番近い仲間1頭だけが情緒たっぷりに呼応する
+    if (isWatch && closestM && closestM.st.replyTimer < 0) {
+      closestM.st.replyTimer = 1.0 + Math.random() * 1.2;
     }
   }
 
@@ -334,6 +342,9 @@ export class WhalePod {
       if (st.autoCallTimer <= 0) {
         st.autoCallTimer = 22 + Math.random() * 35;
         this._emitCall(m, playerPos);
+        if (this.onMemberCall) {
+          this.onMemberCall(m);
+        }
       }
 
       const distToPlayer = p.distanceTo(playerPos);

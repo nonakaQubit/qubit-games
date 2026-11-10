@@ -17,25 +17,42 @@ export class Seabirds {
     this.scene = scene;
     this.fish = fishSchools;
 
-    // 鳥の形状：細い胴体と広げた白い翼（シンプルな低ポリゴン形状）
+    // オオミズナギドリ（背中・翼上が黒褐色、腹部・翼下面が白）の軽量ローポリ形状
+    // 背面（上向き）と腹面（下向き）の独立ポリゴンで構成し、図鑑と同じ配色を実現
     const geom = new THREE.BufferGeometry();
-    // 翼を広げた V 字形の 3 つの三角形（胴体＋左右の翼）
-    // 翼開長 約 80cm
     const vertices = new Float32Array([
-      // 胴体
-      0, 0, 0.25,   -0.04, 0, -0.15,   0.04, 0, -0.15,
-      // 左翼
-      0, 0, 0.05,   -0.45, 0.08, -0.05,   -0.03, 0, -0.12,
-      // 右翼
-      0, 0, 0.05,    0.03, 0, -0.12,     0.45, 0.08, -0.05,
+      // 背面（上面：黒褐色〜翼端ダーク）
+      // 胴体背中
+      0, 0.02, 0.25,   -0.04, 0.01, -0.15,   0.04, 0.01, -0.15,
+      // 左翼上面
+      0, 0.02, 0.05,   -0.48, 0.08, -0.05,   -0.03, 0.01, -0.12,
+      // 右翼上面
+      0, 0.02, 0.05,    0.03, 0.01, -0.12,    0.48, 0.08, -0.05,
+
+      // 腹面（下面：白〜翼端グレー）
+      // 胴体お腹
+      0, -0.02, 0.25,   0.04, -0.01, -0.15,  -0.04, -0.01, -0.15,
+      // 左翼下面
+      0, -0.01, 0.05,  -0.03, -0.01, -0.12,  -0.48, 0.06, -0.05,
+      // 右翼下面
+      0, -0.01, 0.05,   0.48, 0.06, -0.05,    0.03, -0.01, -0.12,
     ]);
+
+    // 図鑑の cDarkBrown (0.16, 0.14, 0.12), cWingTip (0.10, 0.09, 0.08), cWhite (0.92, 0.92, 0.90) に準拠
     const colors = new Float32Array([
-      // 胴体（白〜薄い灰色）
-      0.95, 0.95, 0.95,   0.85, 0.88, 0.9,   0.85, 0.88, 0.9,
-      // 左翼（先端が暗い）
-      0.9, 0.9, 0.92,     0.35, 0.38, 0.4,   0.8, 0.82, 0.85,
-      // 右翼
-      0.9, 0.9, 0.92,     0.8, 0.82, 0.85,   0.35, 0.38, 0.4,
+      // 背面（胴体）
+      0.18, 0.15, 0.13,   0.16, 0.14, 0.12,   0.16, 0.14, 0.12,
+      // 左翼上面（基部ダークブラウン〜翼端ダーク）
+      0.18, 0.15, 0.13,   0.10, 0.09, 0.08,   0.15, 0.13, 0.11,
+      // 右翼上面
+      0.18, 0.15, 0.13,   0.15, 0.13, 0.11,   0.10, 0.09, 0.08,
+
+      // 腹面（胴体：白）
+      0.94, 0.94, 0.92,   0.90, 0.90, 0.88,   0.90, 0.90, 0.88,
+      // 左翼下面（白〜翼端グレー）
+      0.92, 0.92, 0.90,   0.85, 0.85, 0.83,   0.24, 0.22, 0.20,
+      // 右翼下面
+      0.92, 0.92, 0.90,   0.24, 0.22, 0.20,   0.85, 0.85, 0.83,
     ]);
     geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
     geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -43,7 +60,7 @@ export class Seabirds {
 
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.6,
+      roughness: 0.55,
       side: THREE.DoubleSide,
     });
 
@@ -68,6 +85,7 @@ export class Seabirds {
         targetY: 1.5 + Math.random() * 2.5,
         diveTimer: 5 + Math.random() * 15,
         isDiving: false,
+        initialized: false,
       });
       this.mesh.setMatrixAt(i, _m.compose(new THREE.Vector3(0, -100, 0), _q.identity(), _s.setScalar(0)));
     }
@@ -116,9 +134,17 @@ export class Seabirds {
           const targetX = center.x + Math.sin(bird.angle) * (bird.radius * Z.V);
           const targetZ = center.z + Math.cos(bird.angle) * (bird.radius * Z.V);
 
-          bird.pos.x += (targetX - bird.pos.x) * Math.min(1, dt * 2.5);
-          bird.pos.z += (targetZ - bird.pos.z) * Math.min(1, dt * 2.5);
-          bird.pos.y += (targetY - bird.pos.y) * Math.min(1, dt * 3.0);
+          // 魚の群れがリスポーン等で遠くに移動した場合や初回配置時は瞬間移動（画面横断バグを防止）
+          const dx = targetX - bird.pos.x;
+          const dz = targetZ - bird.pos.z;
+          if (!bird.initialized || (dx * dx + dz * dz > 20 * 20 * Z.V * Z.V)) {
+            bird.pos.set(targetX, targetY, targetZ);
+            bird.initialized = true;
+          } else {
+            bird.pos.x += (targetX - bird.pos.x) * Math.min(1, dt * 2.5);
+            bird.pos.z += (targetZ - bird.pos.z) * Math.min(1, dt * 2.5);
+            bird.pos.y += (targetY - bird.pos.y) * Math.min(1, dt * 3.0);
+          }
 
           // 進行方向の向き
           bird.yaw = bird.angle + Math.PI / 2;

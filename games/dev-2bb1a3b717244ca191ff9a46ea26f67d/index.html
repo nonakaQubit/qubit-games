@@ -93,13 +93,6 @@
 .tune-btn.active {
   background: rgba(143, 207, 192, 0.35); border-color: #8fcfc0; color: #fff; font-weight: bold;
 }
-#clearToast {
-  position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
-  background: rgba(16, 45, 50, 0.75); border: 1px solid rgba(143, 207, 192, 0.6);
-  border-radius: 20px; padding: 7px 18px; font-size: 14px; letter-spacing: 0.08em;
-  color: #d8f5ea; pointer-events: none; opacity: 0; transition: opacity 0.4s ease;
-  z-index: 50; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-}
 </style>
 
 <button id="tuneToggleBtn">⚙ 操作テスト設定</button>
@@ -143,8 +136,6 @@
     </label>
   </div>
 </div>
-
-<div id="clearToast"></div>
 
 <script>
 window.RORQUAL_TUNING = {

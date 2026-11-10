@@ -74,6 +74,14 @@ const soundRings = new SoundRings(scene);
 const soundIndicator = new SoundIndicator();
 const pod = new WhalePod(scene, SEA, spout, soundRings, voice, fish, soundIndicator);
 pod.setCamera(camera);
+pod.onMemberCall = (m) => {
+  if (game?.mode === 'watch' && (st.watchCallCooldown ?? 0) <= 0 && (st.watchReplyTimer ?? -1) < 0) {
+    const dist = m.whale.group.position.distanceTo(whale.group.position);
+    if (dist < 75 * Z.V && Math.random() < 0.58) {
+      st.watchReplyTimer = 1.5 + Math.random() * 1.0; // 1.5〜2.5秒後に返答
+    }
+  }
+};
 const birds = new Seabirds(scene, fish);
 const dolphins = new Dolphins(scene, sea, spout);
 dolphins.setCamera(camera);
@@ -312,7 +320,7 @@ function updateWhale(dt) {
     if (ray.ray.intersectPlane(swimPlane, mouse.target)) {
       const dx = mouse.target.x - p.x, dz = mouse.target.z - p.z;
       const dist = Math.hypot(dx, dz);
-      const dMult = window.RORQUAL_TUNING?.deadzoneMult ?? 1.0;
+      const dMult = window.RORQUAL_TUNING?.deadzoneMult ?? 0.5;
       const minTurnDist = (activeTouches.size > 0 ? 2.2 : 4.0) * Z.V * dMult;
       if (dist > minTurnDist) {
         targetYaw = Math.atan2(dx, dz);
@@ -351,26 +359,31 @@ function updateWhale(dt) {
       }
     }
 
-    if (bestSchool && st.lungeT < 0) {
-      // 索餌行動：群れの方向へ緩やかな大きな弧を描いて進路を向ける
+    if (bestSchool && (st.lungeT < 0 || (st.lungeT / Z.T) < (LUNGE_OPEN + 0.8))) {
+      // 索餌・突進行動：群れの中心へ向けてしっかり軸を向ける（突進中は群れを豪快に貫通）
       const dx = bestSchool.center.x - p.x;
       const dz = bestSchool.center.z - p.z;
       const targetAngle = Math.atan2(dx, dz);
       let diff = targetAngle - st.baseYaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      st.baseYaw += diff * Math.min(1, dt * 0.7);
+      const turnK = st.lungeT >= 0 ? 2.8 : 0.85;
+      st.baseYaw += diff * Math.min(1, dt * turnK);
       targetYaw = st.baseYaw;
-      targetSpeed = 2.4 * Z.P;
+      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 2.4 * Z.P;
 
       // 群れに近づいたら（6〜9m）豪快に突進・捕食！
-      if (bestDist < 8.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+      if (st.lungeT < 0 && bestDist < 8.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
         lungeReq = true;
         st.autoLunge = st.autoT;
-        // 捕食後、次に進む大まかな進路を少しオフセット
-        st.baseYaw += (Math.random() - 0.5) * 0.8;
+        st.lungeJustFinished = true;
       }
     } else {
+      // 捕食完了後（口が閉じて通常巡航に戻った後）、ゆったりと次の進路へ抜ける
+      if (st.lungeJustFinished && st.lungeT < 0) {
+        st.lungeJustFinished = false;
+        st.baseYaw += (Math.random() - 0.5) * 0.9;
+      }
       // 通常巡航：広大な海を雄大に直進（わずかな自然のうねり波のみ）
       const wander = Math.sin(st.autoT * 0.05) * 0.12;
       targetYaw = st.baseYaw + wander;
@@ -381,6 +394,29 @@ function updateWhale(dt) {
       if (st.lungeT < 0 && st.autoT - (st.autoLunge || 0) > 8 && fish.near(ahead, 3.5 * Z.V)) {
         lungeReq = true;
         st.autoLunge = st.autoT;
+        st.lungeJustFinished = true;
+      }
+    }
+
+    // 鑑賞モード中の鳴き交わし処理（1往復完結・静寂を保つクールタイム付き）
+    st.watchCallCooldown = Math.max(0, (st.watchCallCooldown ?? 15) - dt);
+    if (st.watchReplyTimer > 0) {
+      st.watchReplyTimer -= dt;
+      if (st.watchReplyTimer <= 0) {
+        st.watchReplyTimer = -1;
+        callReq = true;
+        st.isWatchReply = true; // 返答のため、仲間がさらに返答を被せる連鎖を防止
+        st.watchCallCooldown = 32 + Math.random() * 15;
+      }
+    }
+    // 自発的な気まぐれ呼びかけ（65〜95秒に1回、静けさを保ちながら自クジラもふと一声鳴く）
+    st.watchSpontaneousTimer = (st.watchSpontaneousTimer ?? (40 + Math.random() * 40)) - dt;
+    if (st.watchSpontaneousTimer <= 0 && st.lungeT < 0 && st.breathT < 0 && !isBreaching) {
+      st.watchSpontaneousTimer = 65 + Math.random() * 30;
+      if (st.watchCallCooldown <= 0 && st.watchReplyTimer < 0) {
+        callReq = true;
+        st.isWatchReply = false; // 自発の呼びかけなので、近くの仲間1頭が呼応可能
+        st.watchCallCooldown = 35 + Math.random() * 15;
       }
     }
 
@@ -460,9 +496,9 @@ function updateWhale(dt) {
   } else {
     // 速いほど曲がりにくい。回転半径は MIN_TURN_R m より小さくならない。
     // 曲がる速さそのものにも慣性をつけて、曲がり始めと曲がり終わりをゆっくりにする
-    const rMult = window.RORQUAL_TUNING?.turnRadiusMult ?? 1.0;
-    const rateMult = window.RORQUAL_TUNING?.turnRateMult ?? 1.0;
-    const lungeSteer = window.RORQUAL_TUNING?.lungeSteer ?? 0.0;
+    const rMult = window.RORQUAL_TUNING?.turnRadiusMult ?? 0.5;
+    const rateMult = window.RORQUAL_TUNING?.turnRateMult ?? 1.5;
+    const lungeSteer = window.RORQUAL_TUNING?.lungeSteer ?? 1.0;
     const MIN_TURN_R = Math.max(0.2, 2 * Z.S * rMult);
     const speedDamping = (st.lungeT >= 0 && lungeSteer > 0) ? (1 + (st.speed / Z.P) * 0.13 * (1 - lungeSteer * 0.7)) : (1 + (st.speed / Z.P) * 0.13);
     const maxTurn = 1.2 * rateMult;
@@ -629,7 +665,10 @@ function updateWhale(dt) {
     const speciesId = game?.area?.whale ?? 'minke';
     voice.play(speciesId);
     soundRings.emit(whale.group.position, Z.S);
-    pod.onPlayerCall(whale.group.position);
+    if (!st.isWatchReply) {
+      pod.onPlayerCall(whale.group.position, !playing);
+    }
+    st.isWatchReply = false;
   }
   callReq = false;
 
@@ -789,15 +828,6 @@ window.onSchoolCleared = (schoolPos, species) => {
     // 1. クジラから小さな喜びの光の粒をふわっと放出
     if (spout?.emitWhaleJoy && whale?.group) {
       spout.emitWhaleJoy(whale.group, Z.S, 18);
-    }
-    // (水面の白波・水煙 emitSplash は海中捕食に不自然なため削除)
-    // 2. 画面中央上部の控えめなトースト表示
-    const toast = document.getElementById('clearToast');
-    if (toast) {
-      toast.textContent = '完食';
-      toast.style.opacity = '0.9';
-      clearTimeout(toast._timer);
-      toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 1600);
     }
   } catch (e) {
     console.warn('onSchoolCleared error:', e);

@@ -55,37 +55,48 @@ export class WhalePod {
 
   // 個体ごとのランダムな体格・プロポーション・体色バリエーションを生成
   _createRandomVariation(baseSpecies, index, totalCount) {
-    // 群れの中でサイズ感にメリハリが出るよう、体長倍率の帯域をシャッフルしつつランダム決定
-    // （例：0.76〜0.88の小柄な若鯨、0.92〜1.04の標準個体、1.06〜1.18の堂々たる大型個体）
-    const sizeBands = [
-      randRange(0.76, 0.89),
-      randRange(0.92, 1.05),
-      randRange(1.06, 1.18),
-    ];
-    const sizeScale = sizeBands[(index + Math.floor(Math.random() * totalCount)) % sizeBands.length] * randRange(0.96, 1.04);
+    // 仲間のサイズ：50〜60% の子クジラ（頭でっかち・寄り添い）か、90〜95% の仲間クジラをランダム決定
+    const isCalf = totalCount === 2 ? (index === 0 ? (Math.random() < 0.6) : !this._lastWasCalf) : (Math.random() < 0.5);
+    this._lastWasCalf = isCalf;
 
-    // 若く小柄な個体はややスマートで背びれが高め、大柄な個体は貫禄ある太めの体型になりやすい傾向＋ランダム個性
-    const isYoung = sizeScale < 0.90;
-    const slim = (isYoung ? randRange(0.90, 0.98) : randRange(0.97, 1.08));
-    const deep = (isYoung ? randRange(0.95, 1.01) : randRange(1.00, 1.07));
-    const dorsalSize = randRange(0.84, 1.22);
+    let sizeScale, headWide, eye, uShapeHead, dorsalSize, slim, deep;
+
+    if (isCalf) {
+      // 50〜60% の子クジラ（頭が丸く大きく、目がつぶらで愛らしい幼体プロポーション）
+      sizeScale = randRange(0.50, 0.60);
+      headWide = (baseSpecies.headWide ?? 1.0) * randRange(1.18, 1.28);
+      eye = (baseSpecies.eye ?? 1.0) * 1.35;
+      uShapeHead = true;
+      dorsalSize = randRange(1.12, 1.28);
+      slim = randRange(0.93, 1.03);
+      deep = randRange(1.03, 1.09);
+    } else {
+      // 82〜88% の仲間クジラ（自分1.0より確実に一回り控えめな標準成体）
+      sizeScale = randRange(0.82, 0.88);
+      headWide = baseSpecies.headWide ?? 1.0;
+      eye = baseSpecies.eye ?? 1.0;
+      uShapeHead = baseSpecies.uShapeHead ?? false;
+      dorsalSize = randRange(0.88, 1.05);
+      slim = randRange(0.96, 1.03);
+      deep = randRange(0.98, 1.04);
+    }
+
     const dorsalU = (baseSpecies.dorsalU ?? 0.69) + randRange(-0.02, 0.02);
-
     const basePec = baseSpecies.pecScale ?? [0.5, 0.03, 0.12];
     const pecScale = [
-      basePec[0] * randRange(0.90, 1.14),
+      basePec[0] * randRange(0.92, 1.10),
       basePec[1] * randRange(0.92, 1.10),
-      basePec[2] * randRange(0.90, 1.12),
+      basePec[2] * randRange(0.92, 1.10),
     ];
     const flukeScale = [
-      randRange(0.90, 1.15),
+      randRange(0.92, 1.10),
       1.0,
       randRange(0.92, 1.10),
     ];
 
-    // 体色のランダムな個体差（少し青みがかった明るい若鯨〜渋いダークトーンの歴戦個体）
-    const lumShift = randRange(-0.06, 0.07);
-    const hueShift = randRange(-0.02, 0.02);
+    // 体色のランダムな個体差（仔鯨は少し明るい青みがかったトーン）
+    const lumShift = isCalf ? randRange(0.02, 0.08) : randRange(-0.05, 0.05);
+    const hueShift = isCalf ? randRange(0.01, 0.03) : randRange(-0.02, 0.02);
     const bc = baseSpecies.colors;
     const colors = {
       back: shiftColor(bc.back, lumShift, hueShift),
@@ -95,7 +106,11 @@ export class WhalePod {
     };
 
     return {
+      isCalf,
       length: baseSpecies.length * sizeScale,
+      headWide,
+      eye,
+      uShapeHead,
       slim,
       deep,
       dorsalSize,
@@ -118,8 +133,8 @@ export class WhalePod {
 
     // 海域ごとの仲間クジラ（南極海はクロミンク、他海域は同種）
     const companionSpeciesKey = area.id === 'antarctic' ? 'antarctic_minke' : (area.whale ?? 'minke');
-    // 仲間の頭数も 2〜3 頭でランダムに変化
-    const count = 2 + (Math.random() < 0.45 ? 1 : 0);
+    // 仲間の頭数は 1〜2 頭（多すぎて画面が騒がしくならない規模）
+    const count = 1 + (Math.random() < 0.5 ? 1 : 0);
 
     const baseSpecies = SPECIES[companionSpeciesKey];
 
@@ -127,35 +142,50 @@ export class WhalePod {
     const rightX = fwdZ, rightZ = -fwdX;
 
     // 他の個体やプレイヤーと重ならないランダム初期配置を生成
+    // 先に全メンバーのバリエーション（仔鯨か仲間鯨か）を決定
+    const variations = [];
+    for (let i = 0; i < count; i++) {
+      variations.push(this._createRandomVariation(baseSpecies, i, count));
+    }
+
     const placedOffsets = [];
     for (let i = 0; i < count; i++) {
+      const isCalf = variations[i].isCalf;
       let side = 0, fwd = 0;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        // 1頭目は視界に入りやすい前方〜斜め横、2頭目以降は周囲の広い範囲（前・横・斜め後ろ）にランダム配置
-        if (i === 0) {
+      for (let attempt = 0; attempt < 25; attempt++) {
+        if (isCalf) {
+          // 子クジラ：近すぎず視界や進路を邪魔しない適度な距離に初期配置
           const sign = Math.random() < 0.5 ? 1 : -1;
-          side = sign * randRange(3.8, 8.5);
-          fwd = randRange(-2.0, 8.5);
+          side = sign * randRange(3.8, 6.2);
+          fwd = randRange(-2.5, 1.8);
+        } else if (i === 0) {
+          // 仲間クジラ1頭目：視界に入りやすい前方〜斜め横
+          const sign = Math.random() < 0.5 ? 1 : -1;
+          side = sign * randRange(4.6, 8.5);
+          fwd = randRange(-2.0, 7.5);
         } else {
+          // 仲間クジラ2頭目：周囲の広い範囲
           const angle = randRange(-Math.PI * 0.85, Math.PI * 0.85);
-          const dist = randRange(5.5, 14.5);
+          const dist = randRange(6.0, 14.0);
           side = Math.sin(angle) * dist;
           fwd = Math.cos(angle) * dist;
         }
         // プレイヤー自身（0,0）および既に配置した仲間との距離が十分離れているか確認
-        const okPlayer = Math.hypot(side, fwd) > 4.2;
-        const okOthers = placedOffsets.every((o) => Math.hypot(side - o.side, fwd - o.fwd) > 5.0);
+        const minPlayerDist = isCalf ? 3.0 : 4.0;
+        const okPlayer = Math.hypot(side, fwd) > minPlayerDist;
+        const okOthers = placedOffsets.every((o) => Math.hypot(side - o.side, fwd - o.fwd) > (isCalf ? 3.2 : 4.5));
         if (okPlayer && okOthers) break;
       }
       placedOffsets.push({
         side,
         fwd,
-        depthOffset: randRange(-0.32, 0.22),
+        depthOffset: isCalf ? randRange(-0.18, 0.18) : randRange(-0.32, 0.22),
       });
     }
 
     for (let i = 0; i < count; i++) {
-      const v = this._createRandomVariation(baseSpecies, i, count);
+      const v = variations[i];
+      const isCalf = v.isCalf;
       const indSpecies = Object.assign({}, baseSpecies, v);
       if (v.colors) indSpecies.colors = Object.assign({}, baseSpecies.colors, v.colors);
       const memberZ = scalesOf(indSpecies);
@@ -174,27 +204,36 @@ export class WhalePod {
       whale.group.position.set(x, y, z);
       whale.trail.length = 0;
 
-      // 開始時点の連携関係もランダム化：
-      // 最初から並走（formation）している個体もいれば、自由回遊（free）で別角度へ泳いでいる個体もいる
-      const startInFormation = Math.random() < 0.55;
+      // 開始時点の連携関係：
+      // 子クジラも仲間と同様に50〜55%で並走、残りは自由回遊（常時追従はしない）
+      const startInFormation = Math.random() < 0.52;
       const initialYawOffset = startInFormation
-        ? randRange(-0.18, 0.18)
+        ? randRange(-0.15, 0.15)
         : randRange(-0.75, 0.75);
 
       const preferredSide = off.side >= 0 ? 1 : -1;
-      // 並走時の希望ポジションも個体ごとにランダム（横間隔・前後オフセット）
-      const formSideDist = preferredSide * randRange(4.4, 8.2);
-      const formFwdDist = randRange(-7.5, 6.0);
-      // 個体ごとの協調性（プレイヤーの近くでどれくらい並走に入りやすいか）
-      const cohesion = randRange(0.008, 0.026);
+      // 並走時の希望ポジション（プレイヤーの邪魔にならない適度な間隔）
+      // 子クジラ：3.8〜5.8m（プレイヤーの餌や進行を塞がない）
+      // 仲間クジラ：4.6〜8.2m
+      const formSideDist = isCalf
+        ? preferredSide * randRange(3.8, 5.8)
+        : preferredSide * randRange(4.6, 8.2);
+      const formFwdDist = isCalf
+        ? randRange(-3.5, 0.5)
+        : randRange(-7.0, 5.5);
+
+      // 個体ごとの協調性（プレイヤーの近くで並走に入りやすいか）
+      // 子クジラは「多少追従しやすい程度」（0.025〜0.045）、仲間成体は 0.008〜0.026
+      const cohesion = isCalf ? randRange(0.025, 0.045) : randRange(0.008, 0.026);
 
       const st = {
         id: i,
+        isCalf,
         speciesKey: companionSpeciesKey,
         species: indSpecies,
         Z: memberZ,
         yaw: playerYaw + initialYawOffset,
-        speed: randRange(1.5, 2.2) * memberZ.P,
+        speed: randRange(1.6, 2.2) * memberZ.P,
         targetSpeed: 1.8 * memberZ.P,
         yawRate: 0,
         smoothYawRate: 0,
@@ -208,11 +247,19 @@ export class WhalePod {
         gulp: 0,
         open: 0,
         breathT: -1,
-        sinceBreath: randRange(4, 28),
+        sinceBreath: isCalf ? randRange(3, 18) : randRange(4, 28),
+        breachT: -1,
+        breachTimer: isCalf ? randRange(40, 75) : randRange(60, 110),
+        breachType: 0,
+        breachSpeed0: 0,
+        breachY0: 0,
+        breachPitch0: 0,
+        breachRoll0: 0,
+        roll: 0,
         replyTimer: -1,
-        autoCallTimer: randRange(12, 42),
+        autoCallTimer: isCalf ? randRange(10, 30) : randRange(14, 42),
         mode: startInFormation ? 'formation' : 'free',
-        modeTimer: startInFormation ? randRange(6, 18) : randRange(8, 22),
+        modeTimer: startInFormation ? randRange(7, 16) : randRange(10, 24),
         preferredSide,
         formSideDist,
         formFwdDist,
@@ -225,17 +272,29 @@ export class WhalePod {
     }
   }
 
-  onPlayerCall(playerPos) {
+  onPlayerCall(playerPos, isWatch = false) {
+    let closestM = null, closestDist = Infinity;
     for (const m of this.members) {
       const d = m.whale.group.position.distanceTo(playerPos);
-      if (d < 110 * this.Z.V && m.st.replyTimer < 0) {
-        m.st.replyTimer = 0.7 + Math.random() * 1.5;
-        // プレイヤーが鳴いて呼びかけると、自由回遊中の仲間も高確率で引き寄せられて並走モードに入る
-        if (m.st.mode === 'free' && Math.random() < 0.65) {
-          m.st.mode = 'formation';
-          m.st.modeTimer = randRange(10, 20);
+      if (d < 110 * this.Z.V) {
+        if (d < closestDist) { closestDist = d; closestM = m; }
+        if (!isWatch && m.st.replyTimer < 0) {
+          // 子クジラは少し早めに返答（甘えたような早い鳴き返し）
+          m.st.replyTimer = m.st.isCalf ? (0.4 + Math.random() * 0.7) : (0.7 + Math.random() * 1.5);
+          // 声をかけられたら追従しやすい：
+          // 子クジラは呼ばれると高確率（85%）で並走に入り、母クジラのもとへ泳ぎ寄ってくる
+          // 成体の仲間も 50% 程度でゆったり並走に入る
+          const joinProb = m.st.isCalf ? 0.85 : 0.50;
+          if (Math.random() < joinProb) {
+            m.st.mode = 'formation';
+            m.st.modeTimer = m.st.isCalf ? randRange(14, 25) : randRange(8, 18);
+          }
         }
       }
+    }
+    // 鑑賞モード中のプレイヤー呼びかけ時は、一番近い仲間1頭だけが情緒たっぷりに呼応する
+    if (isWatch && closestM && closestM.st.replyTimer < 0) {
+      closestM.st.replyTimer = 1.0 + Math.random() * 1.2;
     }
   }
 
@@ -283,6 +342,9 @@ export class WhalePod {
       if (st.autoCallTimer <= 0) {
         st.autoCallTimer = 22 + Math.random() * 35;
         this._emitCall(m, playerPos);
+        if (this.onMemberCall) {
+          this.onMemberCall(m);
+        }
       }
 
       const distToPlayer = p.distanceTo(playerPos);
@@ -309,14 +371,14 @@ export class WhalePod {
         // ---- プレイ中 ----
         if (st.mode === 'formation') {
           if (st.modeTimer <= 0) {
-            // 隊列を解消して、自由気ままな回遊へ（次回並走時のポジションも少しランダムに更新）
+            // 隊列を解消して、自由気ままな回遊へ（子クジラも常時追従せず海を泳ぎ回る）
             st.mode = 'free';
             st.modeTimer = randRange(12, 26);
             st.preferredSide = Math.random() < 0.5 ? 1 : -1;
-            st.formSideDist = st.preferredSide * randRange(4.4, 8.5);
-            st.formFwdDist = randRange(-7.5, 6.0);
+            st.formSideDist = st.preferredSide * (st.isCalf ? randRange(3.8, 5.8) : randRange(4.6, 8.2));
+            st.formFwdDist = st.isCalf ? randRange(-3.5, 0.5) : randRange(-7.0, 5.5);
           } else {
-            // 個体ごとのランダムな並走スロット位置
+            // 個体ごとの並走スロット位置（邪魔にならない適度な間隔）
             const sideDist = st.formSideDist * this.Z.V;
             const fwdDist = st.formFwdDist * this.Z.V;
             const tx = playerPos.x + rightX * sideDist + fwdX * fwdDist;
@@ -330,8 +392,13 @@ export class WhalePod {
 
             const dForm = Math.hypot(tx - p.x, tz - p.z);
             desiredSpeed = playerSpeed;
-            if (dForm > 4 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.25, 3.0 * Z.P);
-            else if (dForm < 1.5 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.88, 1.2 * Z.P);
+            if (st.isCalf) {
+              if (dForm > 3.0 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.25, 3.0 * Z.P);
+              else if (dForm < 1.2 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.9, 1.4 * Z.P);
+            } else {
+              if (dForm > 4 * this.Z.V) desiredSpeed = Math.max(playerSpeed * 1.25, 3.0 * Z.P);
+              else if (dForm < 1.5 * this.Z.V) desiredSpeed = Math.min(playerSpeed * 0.88, 1.2 * Z.P);
+            }
           }
         } else if (st.mode === 'free') {
           // 自由気ままな回遊：なめらかな自然の波で泳ぐ
@@ -339,9 +406,10 @@ export class WhalePod {
           targetYaw = st.yaw + wave * dt;
 
           // プレイヤーが仲間クジラの近く（12m 以内）に寄ってきたとき、個体ごとの協調性（cohesion）に応じて並走を組む
+          // （子クジラは少し並走に入りやすい程度で、常時くっつくことはない）
           if (distToPlayer < 12 * this.Z.V && st.modeTimer < 10 && Math.random() < st.cohesion) {
             st.mode = 'formation';
-            st.modeTimer = randRange(8, 18);
+            st.modeTimer = st.isCalf ? randRange(10, 20) : randRange(8, 16);
           }
 
           // 近く（15m 以内）に魚の群れがあれば、たまに食事モードへ
@@ -359,7 +427,7 @@ export class WhalePod {
             }
           }
 
-          // プレイヤーから離れすぎたら（34m 以上）、自然にプレイヤーのいる海域へ旋回して戻る（ワープはしない）
+          // プレイヤーから離れすぎたら、自然にプレイヤーのいる海域へ旋回して戻る（ワープはしない）
           if (distToPlayer > 34 * this.Z.V) {
             const toPlayerYaw = Math.atan2(playerPos.x - p.x, playerPos.z - p.z);
             let diff = toPlayerYaw - st.yaw;
@@ -423,44 +491,112 @@ export class WhalePod {
         st.gulp = Math.max(0, st.gulp - dt * 0.8);
       }
 
-      // 加速
-      st.speed += (st.targetSpeed - st.speed) * Math.min(1, dt * 1.6);
+      // 仲間のブリーチング（気まぐれに海面を突き破って大ジャンプ）
+      st.breachTimer -= dt;
+      if (st.breachTimer <= 0 && st.breachT < 0 && st.lungeT < 0 && st.breathT < 0) {
+        st.breachT = 0;
+        st.breachTimer = st.isCalf ? randRange(45, 85) : randRange(65, 120);
+        st.breachType = Math.floor(Math.random() * 3);
+        st.breachSpeed0 = st.speed;
+        st.breachY0 = p.y;
+        st.breachRoll0 = -st.smoothYawRate * 0.7;
+        st.breachPitch0 = st.pitch;
+        whale.startStroke();
+      }
+
+      const isBreaching = st.breachT >= 0;
+
+      // 加速と位置更新
+      if (!isBreaching) {
+        st.speed += (st.targetSpeed - st.speed) * Math.min(1, dt * 1.6);
+      }
       p.x += Math.sin(st.yaw) * st.speed * dt;
       p.z += Math.cos(st.yaw) * st.speed * dt;
 
-      // 呼吸（息つぎ）：35〜55秒ごとに浮上して潮を吹く
-      st.sinceBreath += dt;
-      if (st.sinceBreath > 36 && st.breathT < 0 && st.lungeT < 0) {
-        st.breathT = 0;
-      }
+      if (isBreaching) {
+        st.breachT += dt;
+        const s0 = st.breachSpeed0 ?? st.speed;
+        const RUN_T = 1.05 * Z.T;
+        const AIR_T = 1.65 * Z.T;
+        const TOTAL_T = RUN_T + AIR_T;
 
-      let riseTarget = 0;
-      if (st.spoutT >= 0) st.spoutT += dt;
-      if (st.breathT >= 0) {
-        st.breathT += dt;
-        if (st.breathT < 1.8 * Z.T) riseTarget = 2.3 * Z.S;
-        if (!st.spouted && p.y > this.depth + 1.2 * Z.S) {
-          st.spouted = true;
-          st.spoutT = 0;
-          this.spout.emit((v) => whale.blowholeWorld(v), Z.S);
-        }
-        if (st.breathT > 5 * Z.T) {
-          st.breathT = -1;
+        const yEntry = -0.45 * Math.pow(Z.S, 0.72);
+        const yExit = -0.60 * Math.pow(Z.S, 0.72);
+        const arcH = 1.25 + 0.12 * Z.S;
+        const yStart = st.breachY0 ?? this.depth;
+        const bRoll0 = st.breachRoll0 || 0;
+
+        if (st.breachT < RUN_T) {
+          // 1. 水中助走加速
+          const u = st.breachT / RUN_T;
+          st.speed = s0 + (9.5 * Z.P - s0) * Math.pow(u, 1.2);
+          p.y = yStart + (yEntry - yStart) * Math.pow(u, 2.0);
+          st.pitch = THREE.MathUtils.lerp(st.breachPitch0, 0.35, u);
+          st.roll = bRoll0;
+        } else if (st.breachT < TOTAL_T) {
+          // 2. 空中跳躍（放物線）
+          const jNorm = (st.breachT - RUN_T) / AIR_T;
+          p.y = yEntry * (1 - jNorm) + yExit * jNorm + 4 * arcH * jNorm * (1 - jNorm);
+          const vyAir = ((yExit - yEntry) + 4 * arcH * (1 - 2 * jNorm)) / AIR_T;
+          st.pitch = Math.atan2(vyAir, Math.max(st.speed, 3.5 * Z.P));
+
+          // 水面突破白波トレイル
+          const aheadPos = new THREE.Vector3(p.x + Math.sin(st.yaw) * 2.2 * Z.S, 0.1, p.z + Math.cos(st.yaw) * 2.2 * Z.S);
+          this.spout.emitWake(aheadPos, Z.S, 1);
+
+          // アクションに応じたロール
+          if (st.breachType === 0) {
+            st.roll = THREE.MathUtils.lerp(bRoll0, bRoll0 + Math.PI * 1.1, jNorm);
+          } else if (st.breachType === 1) {
+            st.roll = THREE.MathUtils.lerp(bRoll0, 0.65, jNorm);
+          } else {
+            st.roll = THREE.MathUtils.lerp(bRoll0, 0, jNorm);
+          }
+        } else {
+          // 3. 着水：大飛沫を放って通常遊泳へ復帰
+          this.spout.emitSplash(p, Z.S * 0.9, 65);
+          st.breachT = -1;
           st.sinceBreath = 0;
-          st.spouted = false;
+          st.vy = -2.5 * Z.P;
+          st.speed = 5.5 * Z.P;
+          st.roll = 0;
         }
+      } else {
+        // 通常の呼吸・浮上バネ計算
+        st.sinceBreath += dt;
+        if (st.sinceBreath > 36 && st.breathT < 0 && st.lungeT < 0) {
+          st.breathT = 0;
+        }
+
+        let riseTarget = 0;
+        if (st.spoutT >= 0) st.spoutT += dt;
+        if (st.breathT >= 0) {
+          st.breathT += dt;
+          if (st.breathT < 1.8 * Z.T) riseTarget = 2.3 * Z.S;
+          if (!st.spouted && p.y > this.depth + 1.2 * Z.S) {
+            st.spouted = true;
+            st.spoutT = 0;
+            this.spout.emit((v) => whale.blowholeWorld(v), Z.S);
+          }
+          if (st.breathT > 5 * Z.T) {
+            st.breathT = -1;
+            st.sinceBreath = 0;
+            st.spouted = false;
+          }
+        }
+
+        const targetDepth = this.depth + (st.depthOffset ?? 0);
+        st.riseGoal += (riseTarget - st.riseGoal) * Math.min(1, dt * 1.5 / Z.T);
+        const K = 5 / (Z.T * Z.T), C = 2 * Math.sqrt(K);
+        st.vy += (K * (targetDepth + st.riseGoal - p.y) - C * st.vy) * dt;
+        p.y += st.vy * dt;
+
+        const pitchTarget = Math.max(-0.25, Math.min(0.25, st.vy / Math.max(st.speed, 2 * Z.P) * 0.5));
+        st.pitch += (pitchTarget - st.pitch) * Math.min(1, dt * 2);
+        st.roll = -st.smoothYawRate * 0.7;
       }
 
-      const targetDepth = this.depth + (st.depthOffset ?? 0);
-      st.riseGoal += (riseTarget - st.riseGoal) * Math.min(1, dt * 1.5 / Z.T);
-      const K = 5 / (Z.T * Z.T), C = 2 * Math.sqrt(K);
-      st.vy += (K * (targetDepth + st.riseGoal - p.y) - C * st.vy) * dt;
-      p.y += st.vy * dt;
-
-      const pitchTarget = Math.max(-0.25, Math.min(0.25, st.vy / Math.max(st.speed, 2 * Z.P) * 0.5));
-      st.pitch += (pitchTarget - st.pitch) * Math.min(1, dt * 2);
-      // 平滑化した smoothYawRate で自然にロール
-      whale.group.rotation.set(-st.pitch, st.yaw, -st.smoothYawRate * 0.7);
+      whale.group.rotation.set(-st.pitch, st.yaw, st.roll ?? 0);
 
       whale.group.updateMatrixWorld();
       whale.animate(dt, st.speed, st.gulp, st.open);

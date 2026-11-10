@@ -66,10 +66,14 @@ export class OceanCreatures {
       const { group, flukeGroup, animate } = builder(idx);
       this.group.add(group);
 
+      const scale = 0.90 + Math.random() * 0.22;
+      group.scale.setScalar(scale);
+
       const spec = CREATURE_SPECS[type] ?? CREATURE_SPECS.shark;
       const item = {
         type,
         spec,
+        scale,
         group,
         flukeGroup,
         animate,
@@ -84,24 +88,33 @@ export class OceanCreatures {
         spawnTimer: 2 + idx * 3,
       };
 
-      // ステージ開始時からすぐに出会えるよう、小型〜中型NPCは前方〜側方の海中に初期配置する
-      if (type !== 'humpback' || idx === 0) {
-        item.active = true;
-        const sideSign = idx % 2 === 0 ? 1 : -1;
-        const sideDist = sideSign * (8 + (idx % 3) * 6) * Z.V;
-        const fwdDist = (10 + idx * 5) * Z.V;
-        const baseDepth = spec.scaleZ ? spec.depth * Z.S : spec.depth;
+      // 海域開始時の初期配置：作為的なお膳立てを排し、広大な海域全体へ自然かつ完全にランダム配置
+      item.active = true;
+      const baseDepth = spec.scaleZ ? spec.depth * Z.S : spec.depth;
+      if (type === 'humpback') {
+        // ザトウクジラ：全方位360度、海域の広い範囲（18〜75m）のどこかに完全ランダム配置
+        const angle = Math.random() * Math.PI * 2;
+        const dist = (18 + Math.random() * 57) * Z.V;
         item.pos.set(
-          playerPos.x + rightX * sideDist + fwdX * fwdDist,
-          baseDepth + (Math.random() - 0.5) * 0.5,
-          playerPos.z + rightZ * sideDist + fwdZ * fwdDist
+          playerPos.x + Math.sin(angle) * dist,
+          baseDepth + (Math.random() - 0.5) * 0.8,
+          playerPos.z + Math.cos(angle) * dist
         );
-        item.yaw = playerYaw + (sideSign > 0 ? -0.55 : 0.55) + (Math.random() - 0.5) * 0.4;
-        group.position.copy(item.pos);
-        group.rotation.set(0, item.yaw, 0, 'YXZ');
+        // 向きも360度ランダム（プレイヤーに都合よく合わせず、自由な方向へ悠然と泳ぐ）
+        item.yaw = Math.random() * Math.PI * 2;
       } else {
-        group.position.set(0, -100, 0);
+        // 小型〜中型NPC（サメ・ウミガメ・マンボウ等）：海域内のランダムな位置・向き
+        const angle = Math.random() * Math.PI * 2;
+        const dist = (12 + Math.random() * 32) * Z.V;
+        item.pos.set(
+          playerPos.x + Math.sin(angle) * dist,
+          baseDepth + (Math.random() - 0.5) * 0.6,
+          playerPos.z + Math.cos(angle) * dist
+        );
+        item.yaw = Math.random() * Math.PI * 2;
       }
+      group.position.copy(item.pos);
+      group.rotation.set(0, item.yaw, 0, 'YXZ');
 
       this.items.push(item);
     });
@@ -127,6 +140,9 @@ export class OceanCreatures {
   _spawnItem(it, playerPos, playerYaw, Z) {
     const { type, spec } = it;
     it.active = true;
+    const scale = 0.90 + Math.random() * 0.22;
+    it.scale = scale;
+    it.group.scale.setScalar(scale);
     const baseDepth = spec.scaleZ ? spec.depth * Z.S : spec.depth;
 
     if (type === 'humpback') {

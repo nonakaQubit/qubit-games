@@ -408,11 +408,11 @@ export class FishSchools {
       if (school.center.distanceTo(whalePos) > FAR * this.Z.V) { this._respawnFar(s, whalePos, heading); continue; }
       if (school.alive < school.size * LEFTOVER) {
         school.leftT += dt;
-        const scatterWait = window.RORQUAL_TUNING ? window.RORQUAL_TUNING.scatterDelay : LEFTOVER_WAIT;
+        const scatterWait = window.RORQUAL_TUNING?.scatterDelay ?? 1.0;
         if (school.leftT >= scatterWait) {
           if (!school.broken) {
             school.broken = true;
-            if (window.RORQUAL_TUNING?.scatterEffect) {
+            if (window.RORQUAL_TUNING ? window.RORQUAL_TUNING.scatterEffect : true) {
               school.pingGlow = 0.8;
               if (!F.dots) {
                 // 小魚はサッと外側へ逃走散開
