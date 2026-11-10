@@ -387,26 +387,26 @@ export class FishSchools {
     this._respawn(s, _v.clone());
   }
 
-  update(dt, whalePos, heading = 0, alarm = 0) {
+  update(dt, whalePos, heading = 0, alarm = 0, whaleSpeed = null) {
     const { pos, vel, alive } = this;
     this.frame = (this.frame || 0) + 1;
 
     let nearest = Infinity, farS = 0, farD = -1;
     this.schools.forEach((sc, s) => {
       const d = sc.center.distanceTo(whalePos);
-      const th = sc.species?.dots ? 0.08 : LEFTOVER;
-      if (sc.alive >= sc.size * th) nearest = Math.min(nearest, d);
+      if (sc.alive >= sc.size * LEFTOVER) nearest = Math.min(nearest, d);
       if (d > farD) { farD = d; farS = s; }
     });
     this.callT = (this.callT || 0) - dt;
     if (nearest > 35 * this.Z.V && this.callT <= 0) { this._respawnFar(farS, whalePos, heading); this.callT = 3; }
 
+    const speedFactor = whaleSpeed ? Math.max(0.6, Math.min(4.0, whaleSpeed / (2.2 * (this.Z?.P || 1)))) : 1.0;
+
     for (let s = 0; s < SCHOOLS; s++) {
       const school = this.schools[s];
       const F = school.species ?? this.food;
       if (school.center.distanceTo(whalePos) > FAR * this.Z.V) { this._respawnFar(s, whalePos, heading); continue; }
-      const thresh = F.dots ? 0.08 : LEFTOVER;
-      if (school.alive < school.size * thresh) {
+      if (school.alive < school.size * LEFTOVER) {
         school.leftT += dt;
         const scatterWait = window.RORQUAL_TUNING ? window.RORQUAL_TUNING.scatterDelay : LEFTOVER_WAIT;
         if (school.leftT >= scatterWait) {
@@ -434,7 +434,7 @@ export class FishSchools {
               }
             }
           }
-          school.fade = Math.max(0, school.fade - dt / FADE_TIME);
+          school.fade = Math.max(0, school.fade - dt * (speedFactor / FADE_TIME));
           if (school.fade <= 0 || school.alive === 0) { this._respawnFar(s, whalePos); continue; }
         }
       }

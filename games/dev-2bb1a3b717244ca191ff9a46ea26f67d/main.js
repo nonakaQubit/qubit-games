@@ -687,7 +687,7 @@ function loop() {
   game.hover(dt, mouse.ndc, mouse.inside);
   // 魚の警戒：突進の踏み込み（尾の打ち下ろし）で半分ほど気づき、口が開き始めると全力で逃げる
   const alarm = st.lungeT >= 0 ? Math.max(0.5 * smooth(0.15, 0.45, st.lungeT / Z.T), smooth(0.05, 0.4, st.open)) : 0;
-  fish.update(dt, mouth, st.yaw, alarm);
+  fish.update(dt, mouth, st.yaw, alarm, st.speed);
   sea.update(dt, whale.group.position);
   spout.update(dt);
   soundRings.update(dt, fish, spout, Z);
