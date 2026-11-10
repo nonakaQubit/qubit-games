@@ -212,16 +212,21 @@ export class FishSchools {
     const dg = new THREE.BufferGeometry();
     dg.setAttribute('position', new THREE.BufferAttribute(dp, 3));
     dg.setAttribute('color', new THREE.BufferAttribute(dc, 3));
+    const da = new Float32Array(n * DOTS).fill(1.0);
+    dg.setAttribute('alpha', new THREE.BufferAttribute(da, 1));
     this.dotPx = { value: 2 };
     this.dots = new THREE.Points(dg, new THREE.ShaderMaterial({
       uniforms: { uPx: this.dotPx, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 } },
       transparent: true, depthWrite: false, vertexColors: true, fog: true,
       vertexShader: /* glsl */`
+        attribute float alpha;
         uniform float uPx;
         varying vec3 vCol;
+        varying float vAlpha;
         #include <fog_pars_vertex>
         void main() {
           vCol = color;
+          vAlpha = alpha;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
           gl_PointSize = clamp(uPx * (62.0 / max(12.0, -mvPosition.z)), uPx * 1.15, uPx * 4.2);
           gl_Position = projectionMatrix * mvPosition;
@@ -229,11 +234,12 @@ export class FishSchools {
         }`,
       fragmentShader: /* glsl */`
         varying vec3 vCol;
+        varying float vAlpha;
         #include <fog_pars_fragment>
         void main() {
           float d = length(gl_PointCoord - 0.5);
-          float a = smoothstep(0.5, 0.18, d) * 0.88;
-          if (a < 0.01) discard;
+          float a = smoothstep(0.5, 0.18, d) * 0.88 * vAlpha;
+          if (a < 0.005) discard;
           gl_FragColor = vec4(vCol, a);
           #include <fog_fragment>
           #include <colorspace_fragment>
@@ -313,6 +319,11 @@ export class FishSchools {
     school.leftT = 0;
     school.fade = 1;
     school.broken = false;
+    const aArr = this.dots?.geometry?.attributes?.alpha?.array;
+    if (aArr) {
+      for (let k = i0 * DOTS; k < (i0 + PER_SCHOOL) * DOTS; k++) aArr[k] = 1.0;
+      this.dots.geometry.attributes.alpha.needsUpdate = true;
+    }
   }
 
   // 吹鳴ソナー反響：音波リングが群れに届いたときに呼ばれ、群れ全体をキラッと発光させる
@@ -383,7 +394,8 @@ export class FishSchools {
     let nearest = Infinity, farS = 0, farD = -1;
     this.schools.forEach((sc, s) => {
       const d = sc.center.distanceTo(whalePos);
-      if (sc.alive >= sc.size * LEFTOVER) nearest = Math.min(nearest, d);
+      const th = sc.species?.dots ? 0.08 : LEFTOVER;
+      if (sc.alive >= sc.size * th) nearest = Math.min(nearest, d);
       if (d > farD) { farD = d; farS = s; }
     });
     this.callT = (this.callT || 0) - dt;
@@ -393,7 +405,8 @@ export class FishSchools {
       const school = this.schools[s];
       const F = school.species ?? this.food;
       if (school.center.distanceTo(whalePos) > FAR * this.Z.V) { this._respawnFar(s, whalePos, heading); continue; }
-      if (school.alive < school.size * LEFTOVER) {
+      const thresh = F.dots ? 0.08 : LEFTOVER;
+      if (school.alive < school.size * thresh) {
         school.leftT += dt;
         const scatterWait = window.RORQUAL_TUNING ? window.RORQUAL_TUNING.scatterDelay : LEFTOVER_WAIT;
         if (school.leftT >= scatterWait) {
@@ -401,14 +414,17 @@ export class FishSchools {
             school.broken = true;
             if (window.RORQUAL_TUNING?.scatterEffect) {
               school.pingGlow = 0.8;
-              const i0 = s * PER_SCHOOL, i1 = i0 + school.size;
-              for (let i = i0; i < i1; i++) {
-                if (alive[i]) {
-                  const dx = pos[i * 3] - school.center.x;
-                  const dz = pos[i * 3 + 2] - school.center.z;
-                  const len = Math.hypot(dx, dz) || 1;
-                  vel[i * 3] += (dx / len) * (F.maxSpeed * 2.8);
-                  vel[i * 3 + 2] += (dz / len) * (F.maxSpeed * 2.8);
+              if (!F.dots) {
+                // 小魚はサッと外側へ逃走散開
+                const i0 = s * PER_SCHOOL, i1 = i0 + school.size;
+                for (let i = i0; i < i1; i++) {
+                  if (alive[i]) {
+                    const dx = pos[i * 3] - school.center.x;
+                    const dz = pos[i * 3 + 2] - school.center.z;
+                    const len = Math.hypot(dx, dz) || 1;
+                    vel[i * 3] += (dx / len) * (F.maxSpeed * 2.8);
+                    vel[i * 3 + 2] += (dz / len) * (F.maxSpeed * 2.8);
+                  }
                 }
               }
               try {
@@ -486,13 +502,17 @@ export class FishSchools {
         if (F.dots) {
           const d = this.dots.geometry.attributes.position.array, o = this.dotOff;
           const cArr = this.dots.geometry.attributes.color.array;
+          const aArr = this.dots.geometry.attributes.alpha.array;
           const gMix = glowAmt > 0 ? Math.sin(glowAmt * Math.PI * 0.5) : 0;
+          const dotFade = school.fade;
           for (let k = 0; k < DOTS; k++) {
             const q = (i * DOTS + k) * 3;
-            const sp = school.spacing * 1.4 * school.fade;
+            const dotIdx = i * DOTS + k;
+            const sp = school.spacing * 1.4; // 形は変えず自然な群れの広がりを維持
             d[q] = pos[p] + o[q] * sp; d[q + 1] = pos[p + 1] + o[q + 1] * sp; d[q + 2] = pos[p + 2] + o[q + 2] * sp;
+            aArr[dotIdx] = dotFade;
             if (updateGlowColor) {
-              // 反響時は真珠色〜まばゆいシアン白に発光
+              // 反響時は真珠色〜まばゆいシアン白に発光、光が引くと元のオキアミ色に戻る
               cArr[q]     = THREE.MathUtils.lerp(0.88, 0.95, gMix);
               cArr[q + 1] = THREE.MathUtils.lerp(0.42, 1.0, gMix);
               cArr[q + 2] = THREE.MathUtils.lerp(0.35, 1.0, gMix);
@@ -516,6 +536,9 @@ export class FishSchools {
       if (updateGlowColor) {
         if (F.dots) this.dots.geometry.attributes.color.needsUpdate = true;
         else if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+      }
+      if (F.dots && school.fade < 1) {
+        this.dots.geometry.attributes.alpha.needsUpdate = true;
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;

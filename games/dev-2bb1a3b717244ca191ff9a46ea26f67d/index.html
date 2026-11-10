@@ -133,13 +133,13 @@
     <input type="range" id="slLunge" min="0" max="1.0" step="0.1" value="0.0" oninput="updateParam('lungeSteer', this.value, 'valLunge', '')">
   </div>
   <div class="tune-row">
-    <label><span>群れ崩壊後の散開遅延</span><span id="valDelay">6.0 秒</span></label>
-    <input type="range" id="slDelay" min="0.1" max="6.0" step="0.2" value="6.0" oninput="updateParam('scatterDelay', this.value, 'valDelay', ' 秒')">
+    <label><span>群れ崩壊後の散開遅延</span><span id="valDelay">1.0 秒</span></label>
+    <input type="range" id="slDelay" min="0.1" max="6.0" step="0.2" value="1.0" oninput="updateParam('scatterDelay', this.value, 'valDelay', ' 秒')">
   </div>
   <div class="tune-row" style="margin-top: 4px;">
     <label style="cursor:pointer;">
       <input type="checkbox" id="cbEffect" onchange="updateEffect(this.checked)" style="accent-color: #8fcfc0;" />
-      <span>群れ完食の光波紋・散開エフェクト</span>
+      <span>群れ完食のキラリ発光・散開エフェクト</span>
     </label>
   </div>
 </div>
@@ -152,7 +152,7 @@ window.RORQUAL_TUNING = {
   turnRateMult: 1.5,
   deadzoneMult: 0.5,
   lungeSteer: 1.0,
-  scatterDelay: 1.5,
+  scatterDelay: 1.0,
   scatterEffect: true,
 };
 
@@ -175,7 +175,7 @@ function applyPreset(type) {
   document.querySelectorAll('.tune-btn').forEach(b => b.classList.remove('active'));
   if (type === 'custom') {
     document.getElementById('presetCustom').classList.add('active');
-    setValues(1.5, 0.5, 0.5, 1.0, 1.5, true);
+    setValues(1.5, 0.5, 0.5, 1.0, 1.0, true);
   } else if (type === 'orig') {
     document.getElementById('presetOrig').classList.add('active');
     setValues(1.0, 1.0, 1.0, 0.0, 6.0, false);
@@ -187,7 +187,7 @@ function applyPreset(type) {
 
 // 初期値を入力スライダーに同期
 window.addEventListener('DOMContentLoaded', () => {
-  setValues(1.5, 0.5, 0.5, 1.0, 1.5, true);
+  setValues(1.5, 0.5, 0.5, 1.0, 1.0, true);
   document.getElementById('presetCustom').classList.add('active');
 });
 

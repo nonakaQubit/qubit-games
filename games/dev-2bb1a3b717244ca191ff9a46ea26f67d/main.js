@@ -732,7 +732,7 @@ window.onSchoolCleared = (schoolPos, species) => {
     // 2. 画面中央上部の控えめなトースト表示
     const toast = document.getElementById('clearToast');
     if (toast) {
-      toast.textContent = '群れを捕食完了';
+      toast.textContent = '完食';
       toast.style.opacity = '0.9';
       clearTimeout(toast._timer);
       toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 1600);
