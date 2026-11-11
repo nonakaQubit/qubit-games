@@ -1,8 +1,8 @@
 // ゲームの流れ：タイトル → 海域でプレイ → クリア → 次の海域 … → エンディング → タイトル
 // ほかに、Esc メニュー、言語の切り替え、図鑑（生き物をクリックで説明）、進み具合の保存
 import * as THREE from 'three';
-import { UI } from './ui.js?v=20261109_v45';
-import { t, setLang } from './i18n.js?v=20261109_v45';
+import { UI } from './ui.js?v=20261110_v54';
+import { t, setLang } from './i18n.js?v=20261110_v54';
 import { areaById, nextArea } from './areas.js?v=20261107_v31';
 import { load, save, encodeSpell, decodeSpell } from './save.js?v=20261109_v45';
 import { SPECIES } from './species.js?v=20261107_v31';
