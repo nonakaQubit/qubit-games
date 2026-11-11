@@ -8,8 +8,8 @@ import { WhalePod } from './pod.js?v=20261110_v53';
 import { Seabirds } from './birds.js?v=20261110_v53';
 import { Dolphins } from './dolphins.js?v=20261110_v53';
 import { OceanCreatures } from './creatures.js?v=20261110_v53';
-import { setupFlow } from './flow.js?v=20261110_v53';
-import { t } from './i18n.js?v=20261110_v53';
+import { setupFlow } from './flow.js?v=20261110_v54';
+import { t } from './i18n.js?v=20261110_v54';
 import { SPECIES, scalesOf } from './species.js?v=20261110_v53';
 
 // オホーツク海：灰緑の濁った冷たい海
