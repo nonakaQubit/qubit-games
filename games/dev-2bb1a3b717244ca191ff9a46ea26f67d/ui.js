@@ -1,6 +1,6 @@
 // 画面の上に重ねるダイアログ類：タイトル、図鑑（3Dライブプレビュー付き）、メニュー、クリア、エンディング、生き物の説明カード
 import * as THREE from 'three';
-import { LANGS, t, getLang } from './i18n.js?v=20261110_v54';
+import { LANGS, t, getLang } from './i18n.js?v=20261113_v55';
 import { AREAS, DEX } from './areas.js?v=20261107_v31';
 import { Whale } from './whale.js?v=20261109_v44';
 import { SPECIES } from './species.js?v=20261107_v31';

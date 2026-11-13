@@ -1,16 +1,16 @@
 import * as THREE from 'three';
-import { Whale } from './whale.js?v=20261109_v44';
-import { FishSchools } from './fish.js?v=20261110_fix1';
-import { Sea } from './sea.js?v=20261109_v41';
-import { Spout } from './spout.js?v=20261107_v36';
-import { WhaleVoice, SoundRings, SoundIndicator, SoundEffects } from './voice.js?v=20261107_v36';
-import { WhalePod } from './pod.js?v=20261107_v33';
-import { Seabirds } from './birds.js';
-import { Dolphins } from './dolphins.js?v=20261107_v39';
-import { OceanCreatures } from './creatures.js?v=20261109_v44';
-import { setupFlow } from './flow.js?v=20261109_v44';
-import { t } from './i18n.js?v=20261109_v41';
-import { SPECIES, scalesOf } from './species.js?v=20261107_v21';
+import { Whale } from './whale.js?v=20261110_v53';
+import { FishSchools } from './fish.js?v=20261110_v53';
+import { Sea } from './sea.js?v=20261110_v53';
+import { Spout } from './spout.js?v=20261110_v53';
+import { WhaleVoice, SoundRings, SoundIndicator, SoundEffects } from './voice.js?v=20261110_v53';
+import { WhalePod } from './pod.js?v=20261110_v53';
+import { Seabirds } from './birds.js?v=20261110_v53';
+import { Dolphins } from './dolphins.js?v=20261110_v53';
+import { OceanCreatures } from './creatures.js?v=20261110_v53';
+import { setupFlow } from './flow.js?v=20261113_v55';
+import { t } from './i18n.js?v=20261113_v55';
+import { SPECIES, scalesOf } from './species.js?v=20261110_v53';
 
 // オホーツク海：灰緑の濁った冷たい海
 // 深さの操作はなし。クジラも魚の群れも同じくらいの深さを泳ぐ
@@ -334,16 +334,24 @@ function updateWhale(dt) {
     st.autoT = (st.autoT || 0) + dt;
     if (st.baseYaw === undefined) st.baseYaw = st.yaw;
 
-    // 索餌ターゲットの探索（前方120度、12〜45mにある生きた群れ）
+    // クジラの口先（頭部）座標
+    const headX = p.x + Math.sin(st.yaw) * 3.6 * Z.S;
+    const headZ = p.z + Math.cos(st.yaw) * 3.6 * Z.S;
+
+    // 索餌ターゲットの探索（前方120度、12〜50mにある生きた群れ）
     let bestSchool = null;
+    let bestIdx = -1;
     let bestDist = Infinity;
+    const schoolCenter = new THREE.Vector3();
     if (fish && fish.schools) {
-      for (const sc of fish.schools) {
+      for (let s = 0; s < fish.schools.length; s++) {
+        const sc = fish.schools[s];
         if (sc.alive <= sc.size * 0.25) continue;
-        const dx = sc.center.x - p.x;
-        const dz = sc.center.z - p.z;
+        const c = fish.getVisualCenter ? fish.getVisualCenter(s, schoolCenter) : sc.center;
+        const dx = c.x - headX;
+        const dz = c.z - headZ;
         const dist = Math.hypot(dx, dz);
-        if (dist > 45 * Z.V || dist < 2.0) continue;
+        if (dist > 50 * Z.V || dist < 0.2) continue;
 
         // クジラの進行方向との角度差
         const angleToSchool = Math.atan2(dx, dz);
@@ -355,25 +363,37 @@ function updateWhale(dt) {
         if (Math.abs(angleDiff) < 1.4 && dist < bestDist) {
           bestDist = dist;
           bestSchool = sc;
+          bestIdx = s;
         }
       }
     }
 
     if (bestSchool && (st.lungeT < 0 || (st.lungeT / Z.T) < (LUNGE_OPEN + 0.8))) {
-      // 索餌・突進行動：群れの中心へ向けてしっかり軸を向ける（突進中は群れを豪快に貫通）
-      const dx = bestSchool.center.x - p.x;
-      const dz = bestSchool.center.z - p.z;
-      const targetAngle = Math.atan2(dx, dz);
+      // 生きている魚の実体重心（見た目の中心）を取得
+      const c = fish.getVisualCenter ? fish.getVisualCenter(bestIdx, schoolCenter) : bestSchool.center;
+
+      // 見越し照準（リード・インターセプト）：
+      // 魚群の移動速度とクジラの接近速度から到達予測時間を計算し、未来の魚群中心を狙う！
+      const curSpeed = Math.max(2.2 * Z.P, st.speed || 2.2 * Z.P);
+      const tLead = Math.min(2.5, bestDist / curSpeed);
+      const leadX = c.x + (bestSchool.vel?.x || 0) * tLead;
+      const leadZ = c.z + (bestSchool.vel?.z || 0) * tLead;
+
+      // 口先から見越し位置への正確な射線角度
+      const targetAngle = Math.atan2(leadX - headX, leadZ - headZ);
+
       let diff = targetAngle - st.baseYaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      const turnK = st.lungeT >= 0 ? 2.8 : 0.85;
+      const turnK = st.lungeT >= 0 ? 3.5 : 1.6;
       st.baseYaw += diff * Math.min(1, dt * turnK);
       targetYaw = st.baseYaw;
-      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 2.4 * Z.P;
+      targetSpeed = st.lungeT >= 0 ? 9 * Z.P : 3.5 * Z.P;
 
-      // 群れに近づいたら（6〜9m）豪快に突進・捕食！
-      if (st.lungeT < 0 && bestDist < 8.5 * Z.V && st.autoT - (st.autoLunge || 0) > 8) {
+      // 突進発動タイミング：
+      // 体長（Z.S）と群れスケール（Z.V）に連動させ、どのクジラ種でも群れの直前でガバッと口を開く間合い（ミンクで約6m）
+      const triggerDist = 2.2 * Z.S + 3.8 * Z.V;
+      if (st.lungeT < 0 && bestDist < triggerDist && st.autoT - (st.autoLunge || 0) > 8) {
         lungeReq = true;
         st.autoLunge = st.autoT;
         st.lungeJustFinished = true;
